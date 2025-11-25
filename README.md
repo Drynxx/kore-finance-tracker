@@ -1,8 +1,8 @@
-# Wealtify - Smart Budget Tracker 💸
+# Kore - Smart Finance Tracker 💸
 
-Wealtify is a modern, high-performance budget tracking application built with **React**, **Vite**, and **Appwrite**. It features a stunning glassmorphic UI, real-time data synchronization, and dynamic wallpaper customization.
+Kore is a modern, high-performance budget tracking application built with **React**, **Vite**, and **Appwrite**. It features a stunning glassmorphic UI, real-time data synchronization, and dynamic wallpaper customization.
 
-![Wealtify Dashboard](https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=2000&auto=format&fit=crop)
+![Kore Dashboard](https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=2000&auto=format&fit=crop)
 
 ## ✨ Features
 
@@ -34,8 +34,8 @@ Wealtify is a modern, high-performance budget tracking application built with **
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/wealtify.git
-    cd wealtify
+    git clone [https://github.com/yourusername/wealtify](https://github.com/Drynxx/kore-finance-tracker).git
+    cd kore-finance-tracker
     ```
 
 2.  **Install dependencies**
