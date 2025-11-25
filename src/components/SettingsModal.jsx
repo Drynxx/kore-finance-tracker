@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import { X, Settings, Image as ImageIcon, DollarSign, User, LogOut, Check, RefreshCw } from 'lucide-react';
+import React, { useState, useContext } from 'react';
+import { X, Settings, Image as ImageIcon, DollarSign, User, LogOut, Check, RefreshCw, FileText, FileDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useWallpaper } from '../context/WallpaperContext';
+import { TransactionContext } from '../context/TransactionContext';
 import { storage, WALLPAPER_BUCKET_ID } from '../lib/appwrite';
+// import { exportToCSV, exportToPDF } from '../utils/exportUtils'; // Disabled for now
 
 const SettingsModal = ({ onClose }) => {
     const { user, logout } = useAuth();
     const { currency, changeCurrency, currencies } = useCurrency();
     const { wallpapers, selectWallpaper, isAutoRotating, enableAutoRotation, wallpaperUrl } = useWallpaper();
+    const { transactions } = useContext(TransactionContext);
     const [activeTab, setActiveTab] = useState('appearance');
 
     const tabs = [
@@ -126,34 +129,37 @@ const SettingsModal = ({ onClose }) => {
                         </div>
                     )}
 
-                    {/* General Tab (Currency) */}
+                    {/* General Tab (Currency & Data) */}
                     {activeTab === 'general' && (
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-2">Currency</h3>
-                                <p className="text-slate-400 text-sm">Select your preferred currency for the dashboard.</p>
-                            </div>
+                        <div className="space-y-8">
+                            {/* Currency Section */}
+                            <div className="space-y-6">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Currency</h3>
+                                    <p className="text-slate-400 text-sm">Select your preferred currency for the dashboard.</p>
+                                </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {Object.values(currencies).map((curr) => (
-                                    <button
-                                        key={curr.code}
-                                        onClick={() => changeCurrency(curr.code)}
-                                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 ${currency.code === curr.code
-                                            ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10'
-                                            : 'bg-slate-800/40 border-white/5 hover:bg-slate-800/60 hover:border-white/10'
-                                            }`}
-                                    >
-                                        <span className="text-3xl">{curr.flag}</span>
-                                        <div className="text-left flex-1">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className={`font-bold ${currency.code === curr.code ? 'text-white' : 'text-slate-300'}`}>{curr.code}</h4>
-                                                {currency.code === curr.code && <Check size={18} className="text-indigo-400" />}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {Object.values(currencies).map((curr) => (
+                                        <button
+                                            key={curr.code}
+                                            onClick={() => changeCurrency(curr.code)}
+                                            className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 ${currency.code === curr.code
+                                                ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10'
+                                                : 'bg-slate-800/40 border-white/5 hover:bg-slate-800/60 hover:border-white/10'
+                                                }`}
+                                        >
+                                            <span className="text-3xl">{curr.flag}</span>
+                                            <div className="text-left flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className={`font-bold ${currency.code === curr.code ? 'text-white' : 'text-slate-300'}`}>{curr.code}</h4>
+                                                    {currency.code === curr.code && <Check size={18} className="text-indigo-400" />}
+                                                </div>
+                                                <p className="text-sm text-slate-400">{curr.name}</p>
                                             </div>
-                                            <p className="text-sm text-slate-400">{curr.name}</p>
-                                        </div>
-                                    </button>
-                                ))}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}

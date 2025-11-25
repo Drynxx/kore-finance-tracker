@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, Lock, ArrowRight, Sparkles, Mail } from 'lucide-react';
+import { User, Lock, ArrowRight, Mail } from 'lucide-react';
 
 export const AuthScreens = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -43,45 +43,59 @@ export const AuthScreens = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-slate-950">
-            {/* Background Ambience */}
-            <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse-slow"></div>
-            <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-rose-500/10 rounded-full blur-[100px] animate-pulse-slow delay-1000"></div>
+        <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+            {/* Photorealistic Background */}
+            <div
+                className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+                style={{
+                    backgroundImage: 'url("https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop")',
+                }}
+            >
+                {/* Dark Overlay for Readability */}
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+            </div>
 
             <div className="w-full max-w-md relative z-10">
-                <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 md:p-10 shadow-2xl">
+                {/* Frosted Glass Card */}
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[2rem] p-8 md:p-12 shadow-2xl shadow-black/50">
 
-                    {/* Header */}
+                    {/* Header with Custom Logo */}
                     <div className="text-center mb-10">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/10 mb-6 shadow-glow">
-                            <Sparkles className="w-8 h-8 text-indigo-300" />
+                        <div className="flex justify-center mb-8 relative">
+                            {/* Glow Effect */}
+                            <div className="absolute inset-0 bg-white/20 blur-2xl rounded-full scale-150 opacity-20"></div>
+                            <img
+                                src="logo.png"
+                                alt="Kore Logo"
+                                className="h-28 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] relative z-10"
+                            />
                         </div>
-                        <h1 className="text-3xl font-serif text-white mb-2">
-                            {isLogin ? 'Welcome Back' : 'Join Us'}
+                        <h1 className="text-3xl font-serif text-white mb-2 tracking-tight">
+                            {isLogin ? 'Welcome back to Kore' : 'Join Kore'}
                         </h1>
-                        <p className="text-slate-400 font-light">
-                            {isLogin ? 'Enter your details to access your account' : 'Start your journey to financial clarity'}
+                        <p className="text-white/70 font-light text-sm">
+                            {isLogin ? 'Enter your details to manage your finances' : 'Start your journey to financial clarity'}
                         </p>
                     </div>
 
                     {/* Form */}
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-5">
                         {error && (
-                            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm text-center">
+                            <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30 text-white text-sm text-center backdrop-blur-sm">
                                 {error}
                             </div>
                         )}
 
                         {!isLogin && (
                             <div className="space-y-2">
-                                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Full Name</label>
+                                <label className="text-xs font-medium text-white/80 uppercase tracking-wider ml-4">Full Name</label>
                                 <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                    <User className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/60 group-focus-within:text-white transition-colors" />
                                     <input
                                         type="text"
                                         value={formData.name}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                                        className="w-full bg-white/10 border border-white/10 rounded-full py-4 pl-14 pr-6 text-white placeholder-white/40 focus:outline-none focus:bg-white/20 focus:border-white/30 transition-all shadow-inner"
                                         placeholder="John Doe"
                                     />
                                 </div>
@@ -89,28 +103,28 @@ export const AuthScreens = () => {
                         )}
 
                         <div className="space-y-2">
-                            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Email</label>
+                            <label className="text-xs font-medium text-white/80 uppercase tracking-wider ml-4">Email</label>
                             <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/60 group-focus-within:text-white transition-colors" />
                                 <input
                                     type="email"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                                    className="w-full bg-white/10 border border-white/10 rounded-full py-4 pl-14 pr-6 text-white placeholder-white/40 focus:outline-none focus:bg-white/20 focus:border-white/30 transition-all shadow-inner"
                                     placeholder="your@email.com"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Password</label>
+                            <label className="text-xs font-medium text-white/80 uppercase tracking-wider ml-4">Password</label>
                             <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/60 group-focus-within:text-white transition-colors" />
                                 <input
                                     type="password"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                                    className="w-full bg-white/10 border border-white/10 rounded-full py-4 pl-14 pr-6 text-white placeholder-white/40 focus:outline-none focus:bg-white/20 focus:border-white/30 transition-all shadow-inner"
                                     placeholder="••••••••"
                                 />
                             </div>
@@ -119,7 +133,7 @@ export const AuthScreens = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium py-4 rounded-xl shadow-lg shadow-indigo-500/20 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-white hover:bg-white/90 text-slate-900 font-bold py-4 rounded-full shadow-lg shadow-black/20 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed mt-4"
                         >
                             {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
                             {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
@@ -134,10 +148,10 @@ export const AuthScreens = () => {
                                 setError('');
                                 setFormData({ name: '', email: '', password: '' });
                             }}
-                            className="text-slate-400 hover:text-white text-sm transition-colors"
+                            className="text-white/70 hover:text-white text-sm transition-colors font-medium"
                         >
                             {isLogin ? "Don't have an account? " : "Already have an account? "}
-                            <span className="text-indigo-400 font-medium hover:underline">
+                            <span className="text-white underline decoration-white/30 hover:decoration-white underline-offset-4">
                                 {isLogin ? 'Sign up' : 'Sign in'}
                             </span>
                         </button>
