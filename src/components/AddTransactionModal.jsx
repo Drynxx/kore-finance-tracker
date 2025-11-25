@@ -59,7 +59,7 @@ const AddTransactionModal = ({ onClose }) => {
             ></div>
 
             {/* Modal Content */}
-            <div className="relative w-full md:w-[480px] bg-slate-900/70 backdrop-blur-3xl md:rounded-[2.5rem] rounded-t-[2.5rem] p-8 shadow-2xl shadow-black/50 border border-white/10 animate-slide-up md:animate-scale-in overflow-hidden">
+            <div className="relative w-full md:w-[480px] bg-slate-900/70 backdrop-blur-3xl md:rounded-[2.5rem] rounded-t-[2.5rem] p-6 md:p-8 shadow-2xl shadow-black/50 border border-white/10 animate-slide-up md:animate-scale-in max-h-[90vh] overflow-y-auto no-scrollbar">
                 {/* Inner Glow */}
                 <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none rounded-[2.5rem]" />
 
@@ -86,7 +86,7 @@ const AddTransactionModal = ({ onClose }) => {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="relative z-10 space-y-6">
+                <form onSubmit={handleSubmit} className="relative z-10 space-y-6 pb-8 md:pb-0">
                     {/* Type Toggle */}
                     <div className="flex bg-black/20 p-1.5 rounded-2xl border border-white/5">
                         <button

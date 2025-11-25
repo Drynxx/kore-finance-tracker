@@ -159,6 +159,13 @@ export const AuthScreens = () => {
 
                 </div>
             </div>
+
+            {/* Creator Credit */}
+            <div className="absolute bottom-6 left-0 right-0 text-center z-20 pointer-events-none">
+                <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-light">
+                    Made by Mattias Tarr
+                </p>
+            </div>
         </div>
     );
 };
