@@ -81,22 +81,22 @@ const TransactionList = () => {
                                         return (
                                             <div
                                                 key={transaction.id}
-                                                className="group flex items-center justify-between p-4 rounded-2xl hover:bg-white/5 transition-all duration-300 cursor-default border border-transparent hover:border-white/5"
+                                                className="group flex items-center justify-between p-4 rounded-2xl hover:bg-white/5 transition-all duration-300 cursor-default border border-transparent hover:border-white/5 relative overflow-hidden"
                                                 style={{ animationDelay: `${index * 50}ms` }}
                                             >
-                                                <div className="flex items-center gap-5">
-                                                    <div className={`p-3 rounded-xl bg-white/5 text-slate-400 group-hover:text-white group-hover:bg-white/10 transition-all duration-300 shadow-inner shadow-white/5`}>
+                                                <div className="flex items-center gap-4 md:gap-5 min-w-0 flex-1">
+                                                    <div className={`p-3 rounded-xl bg-white/5 text-slate-400 group-hover:text-white group-hover:bg-white/10 transition-all duration-300 shadow-inner shadow-white/5 flex-shrink-0`}>
                                                         <Icon size={20} strokeWidth={1.5} />
                                                     </div>
-                                                    <div>
-                                                        <p className="font-medium text-slate-200 text-base tracking-wide">{transaction.category}</p>
+                                                    <div className="min-w-0 flex-1 pr-2">
+                                                        <p className="font-medium text-slate-200 text-base tracking-wide truncate">{transaction.category}</p>
                                                         {transaction.note && (
-                                                            <p className="text-xs text-slate-500 font-light mt-0.5">{transaction.note}</p>
+                                                            <p className="text-xs text-slate-500 font-light mt-0.5 truncate">{transaction.note}</p>
                                                         )}
                                                     </div>
                                                 </div>
-                                                <div className="text-right flex items-center gap-4">
-                                                    <p className={`font-light text-lg tracking-wider ${isExpense ? 'text-slate-200' : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]'}`}>
+                                                <div className="text-right flex items-center gap-3 md:gap-4 flex-shrink-0">
+                                                    <p className={`font-light text-lg tracking-wider whitespace-nowrap ${isExpense ? 'text-slate-200' : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]'}`}>
                                                         {isExpense ? '-' : '+'}{formatAmount(Math.abs(transaction.amount))}
                                                     </p>
                                                     <button
@@ -104,9 +104,11 @@ const TransactionList = () => {
                                                             e.stopPropagation();
                                                             deleteTransaction(transaction.id);
                                                         }}
-                                                        className="text-xs text-rose-400/50 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all uppercase tracking-wider"
+                                                        className="p-2 -mr-2 md:mr-0 text-rose-400/50 hover:text-rose-400 md:opacity-0 md:group-hover:opacity-100 transition-all"
+                                                        aria-label="Delete transaction"
                                                     >
-                                                        Delete
+                                                        <span className="md:hidden text-xs uppercase tracking-wider font-medium">Del</span>
+                                                        <span className="hidden md:inline text-xs uppercase tracking-wider">Delete</span>
                                                     </button>
                                                 </div>
                                             </div>

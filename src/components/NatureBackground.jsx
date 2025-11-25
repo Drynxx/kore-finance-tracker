@@ -15,12 +15,12 @@ export const NatureBackground = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 1.5 }}
-                        className="absolute inset-0"
+                        className="absolute inset-0 will-change-transform"
                     >
                         <img
                             src={wallpaperUrl}
                             alt="Background"
-                            className="w-full h-full object-cover opacity-60 blur-sm scale-105"
+                            className="w-full h-full object-cover opacity-60 blur-sm scale-105 will-change-transform backface-hidden"
                         />
                         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/50 via-slate-900/20 to-slate-900/80" />
                     </motion.div>
@@ -31,11 +31,11 @@ export const NatureBackground = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 1 }}
-                        className="absolute inset-0"
+                        className="absolute inset-0 will-change-transform"
                     >
                         {/* Default Yosemite-like Gradient if no wallpaper */}
                         <div className="absolute inset-0 bg-gradient-to-br from-[#2c3e50] via-[#4ca1af] to-[#2c3e50] opacity-50" />
-                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1449034446853-66c86144b0ad?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40 blur-sm scale-105" />
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1449034446853-66c86144b0ad?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40 blur-sm scale-105 will-change-transform backface-hidden" />
                         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/50 via-slate-900/20 to-slate-900/80" />
                     </motion.div>
                 )}
