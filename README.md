@@ -34,7 +34,7 @@ Kore is a modern, high-performance budget tracking application built with **Reac
 
 1.  **Clone the repository**
     ```bash
-    git clone [https://github.com/yourusername/wealtify](https://github.com/Drynxx/kore-finance-tracker).git
+    git clone [https://github.com/Drynxx/kore-finance-tracker.git]
     cd kore-finance-tracker
     ```
 
