@@ -1,33 +1,42 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Plus, List, Wallet, Settings } from 'lucide-react';
+import { LayoutDashboard, Plus, List, Wallet, Settings, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SettingsModal } from './SettingsModal';
+import { AIAssistantModal } from './AIAssistantModal';
 import { motion } from 'framer-motion';
 
 const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
     const { user } = useAuth();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isAIOpen, setIsAIOpen] = useState(false);
 
-    const DockIcon = ({ icon: Icon, label, isActive, onClick }) => (
-        <motion.button
-            onClick={onClick}
-            whileHover={{ scale: 1.2 }}
-            whileTap={{ scale: 0.95 }}
-            className={`relative p-3 rounded-2xl transition-all duration-300 group ${isActive ? 'bg-white/20 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}
-        >
-            <Icon size={24} strokeWidth={1.5} />
-            <span className="absolute left-full ml-4 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none backdrop-blur-md border border-white/10">
-                {label}
-            </span>
-            {isActive && (
-                <motion.div
-                    layoutId="activeTab"
-                    className="absolute inset-0 bg-white/10 rounded-2xl -z-10"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                />
-            )}
-        </motion.button>
-    );
+    const DockIcon = ({ icon: Icon, label, isActive, onClick }) => {
+        const isAI = label === 'Kore Assistant';
+
+        return (
+            <motion.button
+                onClick={onClick}
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.95 }}
+                className={`relative p-3 rounded-2xl transition-all duration-300 group 
+                    ${isActive ? 'bg-white/20 text-white shadow-lg shadow-indigo-500/20' :
+                        isAI ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/20 hover:text-white hover:border-indigo-400' :
+                            'text-slate-400 hover:bg-white/10 hover:text-white'}`}
+            >
+                <Icon size={24} strokeWidth={1.5} className={isAI ? "animate-pulse" : ""} />
+                <span className="absolute left-full ml-4 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none backdrop-blur-md border border-white/10">
+                    {label}
+                </span>
+                {isActive && (
+                    <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-0 bg-white/10 rounded-2xl -z-10"
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    />
+                )}
+            </motion.button>
+        );
+    };
 
     return (
         <div className="min-h-screen flex flex-col md:flex-row font-sans text-slate-200">
@@ -59,6 +68,12 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                             label="Transactions"
                             isActive={activeTab === 'transactions'}
                             onClick={() => setActiveTab('transactions')}
+                        />
+                        <DockIcon
+                            icon={Sparkles}
+                            label="Kore Assistant"
+                            isActive={isAIOpen}
+                            onClick={() => setIsAIOpen(true)}
                         />
                         <DockIcon
                             icon={Settings}
@@ -97,13 +112,8 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                         {user?.name?.charAt(0) || 'U'}
                     </div>
 
-                    {/* Right Side - Settings */}
-                    <button
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="relative z-10 p-3 rounded-2xl text-slate-400 hover:bg-white/10 hover:text-white transition-all bg-white/5 border border-white/5"
-                    >
-                        <Settings size={20} strokeWidth={1.5} />
-                    </button>
+                    {/* Right Side - Empty for balance */}
+                    <div className="w-8 h-8" />
                 </div>
             </header>
 
@@ -114,26 +124,44 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
 
             {/* Mobile Bottom Navigation (Dark Glass Floating Pill) */}
             <nav className="fixed bottom-6 left-6 right-6 z-50 md:hidden pointer-events-none">
-                <div className="bg-slate-900/60 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-[0_0_20px_rgba(0,0,0,0.3)] h-20 px-8 flex justify-between items-center relative pointer-events-auto">
+                <div className="bg-slate-900/60 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-[0_0_20px_rgba(0,0,0,0.3)] h-20 px-6 flex justify-between items-center relative pointer-events-auto">
                     {/* Inner Glow */}
                     <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/5 pointer-events-none rounded-[2rem]" />
 
-                    <button
-                        onClick={() => setActiveTab('dashboard')}
-                        className={`relative z-10 transition-all duration-300 ${activeTab === 'dashboard' ? 'text-indigo-400 scale-110 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500'}`}
-                    >
-                        <LayoutDashboard size={24} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} />
-                    </button>
+                    <div className="flex items-center gap-8">
+                        <button
+                            onClick={() => setActiveTab('dashboard')}
+                            className={`relative z-10 transition-all duration-300 ${activeTab === 'dashboard' ? 'text-indigo-400 scale-110 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500'}`}
+                        >
+                            <LayoutDashboard size={24} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} />
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('transactions')}
+                            className={`relative z-10 transition-all duration-300 ${activeTab === 'transactions' ? 'text-indigo-400 scale-110 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500'}`}
+                        >
+                            <List size={24} strokeWidth={activeTab === 'transactions' ? 2.5 : 2} />
+                        </button>
+                    </div>
 
                     {/* Spacer for FAB */}
-                    <div className="w-14" />
+                    <div className="w-12" />
 
-                    <button
-                        onClick={() => setActiveTab('transactions')}
-                        className={`relative z-10 transition-all duration-300 ${activeTab === 'transactions' ? 'text-indigo-400 scale-110 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500'}`}
-                    >
-                        <List size={24} strokeWidth={activeTab === 'transactions' ? 2.5 : 2} />
-                    </button>
+                    <div className="flex items-center gap-8">
+                        <button
+                            onClick={() => setIsAIOpen(true)}
+                            className={`relative z-10 transition-all duration-300 ${isAIOpen ? 'text-indigo-400 scale-110 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500'}`}
+                        >
+                            <Sparkles size={24} strokeWidth={2} className={isAIOpen ? "animate-pulse" : ""} />
+                        </button>
+
+                        <button
+                            onClick={() => setIsSettingsOpen(true)}
+                            className={`relative z-10 transition-all duration-300 ${isSettingsOpen ? 'text-indigo-400 scale-110 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500'}`}
+                        >
+                            <Settings size={24} strokeWidth={isSettingsOpen ? 2.5 : 2} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* FAB - Positioned relative to the nav container, sitting on top */}
@@ -152,6 +180,11 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
             {/* Settings Modal */}
             {isSettingsOpen && (
                 <SettingsModal onClose={() => setIsSettingsOpen(false)} />
+            )}
+
+            {/* AI Assistant Modal */}
+            {isAIOpen && (
+                <AIAssistantModal onClose={() => setIsAIOpen(false)} />
             )}
         </div>
     );
