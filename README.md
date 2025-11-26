@@ -14,6 +14,10 @@ Kore is a modern, high-performance budget tracking application built with **Reac
     -   **Manual Selection**: Choose your favorite backdrop from the settings.
 -   **🌍 Multi-Currency Support**: Switch between USD, EUR, GBP, JPY, and more with real-time UI updates.
 -   **🔐 Secure Authentication**: Powered by Appwrite Auth for secure sign-up and login.
+-   **🤖 Kore Assistant**:
+    -   **Voice-Activated**: Log transactions simply by speaking (e.g., "Spent 50 lei on pizza").
+    -   **Smart Parsing**: Powered by Google Gemini AI to automatically extract amount, category, and date.
+    -   **Gemini Live Aesthetic**: A stunning, deep-space visualizer that reacts to your voice in real-time.
 -   **📱 Fully Responsive**: Works seamlessly on desktop, tablet, and mobile devices.
 
 ## 🛠️ Tech Stack
@@ -51,6 +55,7 @@ Kore is a modern, high-performance budget tracking application built with **Reac
     VITE_APPWRITE_DATABASE_ID=your_database_id
     VITE_APPWRITE_COLLECTION_ID=your_collection_id
     VITE_APPWRITE_WALLPAPER_BUCKET_ID=your_bucket_id
+    VITE_GEMINI_API_KEY=your_gemini_api_key
     ```
 
 4.  **Run the development server**
