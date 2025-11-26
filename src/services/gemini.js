@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+console.log("Gemini Service Loaded. Key present:", !!API_KEY);
 
 let genAI = null;
 let model = null;
@@ -26,13 +27,14 @@ export const parseTransactionWithGemini = async (text, currencySymbol = '$') => 
     3. **Category**: Choose best match from: ["Food", "Rent", "Salary", "Freelance", "Transport", "Entertainment", "Shopping", "Utilities", "Other"].
     4. **Note**: A short description of what it was for.
     5. **Date**: YYYY-MM-DD (default to today: ${new Date().toISOString().split('T')[0]}).
+    6. **conversational_response**: A short, friendly, natural language confirmation of what you did. Be professional but helpful. (e.g., "I've logged 50 lei for pizza. Enjoy!", "Rent payment recorded.", "Salary added. Nice work!").
 
     Output strictly valid JSON.
     
     Examples:
-    "50 lei pizza" -> {"type": "expense", "amount": 50, "category": "Food", "note": "pizza", "date": "${new Date().toISOString().split('T')[0]}"}
-    "Am cheltuit 100 pe benzina" -> {"type": "expense", "amount": 100, "category": "Transport", "note": "benzina", "date": "${new Date().toISOString().split('T')[0]}"}
-    "Salariu 5000" -> {"type": "income", "amount": 5000, "category": "Salary", "note": "Salariu", "date": "${new Date().toISOString().split('T')[0]}"}
+    "50 lei pizza" -> {"type": "expense", "amount": 50, "category": "Food", "note": "pizza", "date": "${new Date().toISOString().split('T')[0]}", "conversational_response": "I've logged 50 lei for pizza. Enjoy your meal!"}
+    "Am cheltuit 100 pe benzina" -> {"type": "expense", "amount": 100, "category": "Transport", "note": "benzina", "date": "${new Date().toISOString().split('T')[0]}", "conversational_response": "Got it. 100 lei for fuel added to Transport."}
+    "Salariu 5000" -> {"type": "income", "amount": 5000, "category": "Salary", "note": "Salariu", "date": "${new Date().toISOString().split('T')[0]}", "conversational_response": "Salary of 5000 lei recorded. Great job!"}
     `;
 
     try {

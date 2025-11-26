@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Plus, List, Wallet, Settings, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Plus, List, Wallet, Settings, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SettingsModal } from './SettingsModal';
 import { AIAssistantModal } from './AIAssistantModal';
@@ -20,10 +20,10 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                 whileTap={{ scale: 0.95 }}
                 className={`relative p-3 rounded-2xl transition-all duration-300 group 
                     ${isActive ? 'bg-white/20 text-white shadow-lg shadow-indigo-500/20' :
-                        isAI ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/20 hover:text-white hover:border-indigo-400' :
+                        isAI ? 'bg-gradient-to-br from-blue-600/20 to-indigo-600/20 text-blue-400 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)] hover:text-white hover:border-blue-400 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]' :
                             'text-slate-400 hover:bg-white/10 hover:text-white'}`}
             >
-                <Icon size={24} strokeWidth={1.5} className={isAI ? "animate-pulse" : ""} />
+                <Icon size={24} strokeWidth={1.5} className={isAI ? "drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]" : ""} />
                 <span className="absolute left-full ml-4 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none backdrop-blur-md border border-white/10">
                     {label}
                 </span>
@@ -70,7 +70,7 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                             onClick={() => setActiveTab('transactions')}
                         />
                         <DockIcon
-                            icon={Sparkles}
+                            icon={Bot}
                             label="Kore Assistant"
                             isActive={isAIOpen}
                             onClick={() => setIsAIOpen(true)}
@@ -150,9 +150,9 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                     <div className="flex items-center gap-8">
                         <button
                             onClick={() => setIsAIOpen(true)}
-                            className={`relative z-10 transition-all duration-300 ${isAIOpen ? 'text-indigo-400 scale-110 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500'}`}
+                            className={`relative z-10 transition-all duration-300 ${isAIOpen ? 'text-blue-400 scale-110 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)]' : 'text-slate-500'}`}
                         >
-                            <Sparkles size={24} strokeWidth={2} className={isAIOpen ? "animate-pulse" : ""} />
+                            <Bot size={24} strokeWidth={2} className={isAIOpen ? "animate-pulse" : ""} />
                         </button>
 
                         <button
