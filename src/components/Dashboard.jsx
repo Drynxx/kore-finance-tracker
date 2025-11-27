@@ -46,7 +46,7 @@ const Dashboard = () => {
             {/* Net Balance Card - Large */}
             <motion.div
                 variants={item}
-                className="md:col-span-1 bg-slate-900/40 backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl shadow-black/20 relative overflow-hidden group"
+                className="md:col-span-1 bg-slate-900/40 backdrop-blur-xl md:backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl shadow-black/20 relative overflow-hidden group"
             >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl group-hover:bg-white/10 transition-all duration-500"></div>
 
@@ -74,7 +74,7 @@ const Dashboard = () => {
             {/* Spending Art (Donut) */}
             <motion.div
                 variants={item}
-                className="md:col-span-1 bg-slate-900/40 backdrop-blur-3xl rounded-[2.5rem] p-6 border border-white/10 shadow-2xl shadow-black/20 relative overflow-hidden"
+                className="md:col-span-1 bg-slate-900/40 backdrop-blur-xl md:backdrop-blur-3xl rounded-[2.5rem] p-6 border border-white/10 shadow-2xl shadow-black/20 relative overflow-hidden"
             >
                 <h3 className="text-white font-medium mb-4">Spending Art</h3>
                 <div className="h-[180px]">
@@ -85,7 +85,7 @@ const Dashboard = () => {
             {/* Daily Average (Small Card) */}
             <motion.div
                 variants={item}
-                className="md:col-span-1 bg-slate-900/40 backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl shadow-black/20 flex flex-col justify-center"
+                className="md:col-span-1 bg-slate-900/40 backdrop-blur-xl md:backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl shadow-black/20 flex flex-col justify-center"
             >
                 <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Daily Average</h3>
                 <p className="text-3xl font-medium text-white">{formatAmount(expense / 30)}</p>
@@ -95,7 +95,7 @@ const Dashboard = () => {
             {/* Trend Graph (Wide Bottom Card) */}
             <motion.div
                 variants={item}
-                className="md:col-span-3 bg-slate-900/40 backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl shadow-black/20 relative overflow-hidden min-h-[300px]"
+                className="md:col-span-3 bg-slate-900/40 backdrop-blur-xl md:backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl shadow-black/20 relative overflow-hidden min-h-[300px]"
             >
                 <BudgetGraph />
             </motion.div>

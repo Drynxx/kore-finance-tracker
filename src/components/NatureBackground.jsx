@@ -16,10 +16,13 @@ export const NatureBackground = () => {
                         exit={{ opacity: 0 }}
                         transition={{ duration: 1.5 }}
                         className="absolute inset-0 will-change-transform"
+                        style={{ transform: 'translateZ(0)' }} // Force GPU layer
                     >
                         <img
                             src={wallpaperUrl}
                             alt="Background"
+                            loading="eager"
+                            decoding="async"
                             className="w-full h-full object-cover opacity-60 blur-sm will-change-transform backface-hidden"
                         />
                         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/50 via-slate-900/20 to-slate-900/80" />
@@ -32,6 +35,7 @@ export const NatureBackground = () => {
                         exit={{ opacity: 0 }}
                         transition={{ duration: 1 }}
                         className="absolute inset-0 will-change-transform"
+                        style={{ transform: 'translateZ(0)' }} // Force GPU layer
                     >
                         {/* Default Yosemite-like Gradient if no wallpaper */}
                         <div className="absolute inset-0 bg-gradient-to-br from-[#2c3e50] via-[#4ca1af] to-[#2c3e50] opacity-50" />

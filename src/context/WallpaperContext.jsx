@@ -68,6 +68,10 @@ export const WallpaperProvider = ({ children }) => {
         }
     };
 
+    const toggleAutoRotation = () => {
+        setIsAutoRotating(prev => !prev);
+    };
+
     return (
         <WallpaperContext.Provider value={{
             wallpaperUrl,
@@ -75,7 +79,8 @@ export const WallpaperProvider = ({ children }) => {
             loading,
             isAutoRotating,
             selectWallpaper,
-            enableAutoRotation
+            enableAutoRotation,
+            toggleAutoRotation
         }}>
             {children}
         </WallpaperContext.Provider>
