@@ -13,28 +13,56 @@ if (API_KEY) {
     console.error("Gemini API Key is missing! Make sure VITE_GEMINI_API_KEY is set in .env");
 }
 
-export const parseTransactionWithGemini = async (text, currencySymbol = '$') => {
+export const parseTransactionWithGemini = async (text, history = []) => {
     if (!model) {
         throw new Error("Gemini API is not configured. Please check your settings.");
     }
 
-    const prompt = `
-    Extract transaction details from: "${text}".
-    
-    Rules:
-    1. **Amount**: Find the number representing the cost or income. Ignore currency symbols like "lei", "RON", "$", "€". If multiple numbers, pick the one that looks like a price.
-    2. **Type**: "expense" (spending) or "income" (earning). Default to "expense".
-    3. **Category**: Choose best match from: ["Food", "Rent", "Salary", "Freelance", "Transport", "Entertainment", "Shopping", "Utilities", "Other"].
-    4. **Note**: A short description of what it was for.
-    5. **Date**: YYYY-MM-DD (default to today: ${new Date().toISOString().split('T')[0]}).
-    6. **conversational_response**: A short, friendly, natural language confirmation of what you did. Be professional but helpful. (e.g., "I've logged 50 lei for pizza. Enjoy!", "Rent payment recorded.", "Salary added. Nice work!").
+    // Prepare history context (limit to last 50 transactions to save tokens/latency)
+    const recentHistory = history.slice(0, 50).map(t => ({
+        date: t.date,
+        amount: t.amount,
+        category: t.category,
+        note: t.note,
+        type: t.type
+    }));
 
-    Output strictly valid JSON.
-    
-    Examples:
-    "50 lei pizza" -> {"type": "expense", "amount": 50, "category": "Food", "note": "pizza", "date": "${new Date().toISOString().split('T')[0]}", "conversational_response": "I've logged 50 lei for pizza. Enjoy your meal!"}
-    "Am cheltuit 100 pe benzina" -> {"type": "expense", "amount": 100, "category": "Transport", "note": "benzina", "date": "${new Date().toISOString().split('T')[0]}", "conversational_response": "Got it. 100 lei for fuel added to Transport."}
-    "Salariu 5000" -> {"type": "income", "amount": 5000, "category": "Salary", "note": "Salariu", "date": "${new Date().toISOString().split('T')[0]}", "conversational_response": "Salary of 5000 lei recorded. Great job!"}
+    const prompt = `
+    Current Date: ${new Date().toISOString().split('T')[0]}
+    Transaction History: ${JSON.stringify(recentHistory)}
+    User Input: "${text}"
+
+    You are a smart financial assistant. Analyze the User Input and determine the INTENT.
+
+    ---
+    INTENT 1: ADD_TRANSACTION
+    Trigger: User wants to log an expense or income (e.g., "Spent 50 on pizza", "Salary came in").
+    Output JSON:
+    {
+        "intent": "add",
+        "type": "expense" | "income",
+        "amount": number,
+        "category": "Food" | "Rent" | "Salary" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Other",
+        "note": "short description",
+        "date": "YYYY-MM-DD",
+        "conversational_response": "Added 50 lei for pizza."
+    }
+
+    ---
+    INTENT 2: QUERY
+    Trigger: User asks a question about their finances (e.g., "How much did I spend on food?", "What was my biggest expense?", "Total income?").
+    Action: Analyze the "Transaction History" provided above to answer the question accurately.
+    Output JSON:
+    {
+        "intent": "query",
+        "conversational_response": "You spent a total of 450 lei on Food this month. Your biggest expense was 200 lei for Groceries."
+    }
+
+    ---
+    Rules:
+    1. For QUERY, be concise, professional, and helpful. Do not hallucinate data not in the history.
+    2. For ADD, default to "expense" if unclear.
+    3. Output STRICTLY valid JSON.
     `;
 
     try {
@@ -49,7 +77,6 @@ export const parseTransactionWithGemini = async (text, currencySymbol = '$') => 
         return JSON.parse(text);
     } catch (error) {
         console.error("Gemini Error:", error);
-        // Pass the actual error message to the user for better debugging
         throw new Error(`AI Error: ${error.message || "Unknown error"}`);
     }
 };

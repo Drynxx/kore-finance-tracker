@@ -1,11 +1,12 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { TransactionContext } from '../context/TransactionContext';
 import { parseTransactionWithGemini } from '../services/gemini';
-import { Bot, Send, X, Check, Loader2, Mic, MicOff, Undo2, Keyboard, Activity } from 'lucide-react';
+import { Bot, Send, X, Check, Loader2, Mic, Keyboard, Activity, Sparkles } from 'lucide-react';
+import { VoiceVisualizer } from './VoiceVisualizer';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const AIAssistantModal = ({ onClose }) => {
-    const { addTransaction } = useContext(TransactionContext);
+    const { addTransaction, transactions } = useContext(TransactionContext);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
@@ -20,15 +21,9 @@ const AIAssistantModal = ({ onClose }) => {
     // TTS Helper
     const speak = (text) => {
         if ('speechSynthesis' in window) {
-            // Cancel current speech to avoid queue buildup
             window.speechSynthesis.cancel();
-
             const utterance = new SpeechSynthesisUtterance(text);
-
-            // Get voices (handling async loading if needed, though usually loaded by now)
             let voices = window.speechSynthesis.getVoices();
-
-            // Retry getting voices if empty (Chrome quirk)
             if (voices.length === 0) {
                 window.speechSynthesis.onvoiceschanged = () => {
                     voices = window.speechSynthesis.getVoices();
@@ -41,29 +36,22 @@ const AIAssistantModal = ({ onClose }) => {
     };
 
     const selectVoiceAndSpeak = (utterance, voices, text) => {
-        // Priority: 
-        // 1. "Natural" (Edge/Windows High Quality)
-        // 2. "Google" (Chrome High Quality)
-        // 3. Any Romanian voice
         const roVoices = voices.filter(v => v.lang.includes('ro'));
-
         const preferredVoice = roVoices.find(v => v.name.includes('Natural')) ||
             roVoices.find(v => v.name.includes('Google')) ||
             roVoices[0];
 
         if (preferredVoice) {
             utterance.voice = preferredVoice;
-            // Slightly faster rate for a more "assistant" feel
             utterance.rate = 1.05;
             utterance.pitch = 1.0;
         }
-
         window.speechSynthesis.speak(utterance);
     };
 
     const startListening = () => {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            setError("Voice input is not supported in this browser.");
+            setError("Voice input is not supported.");
             return;
         }
 
@@ -119,14 +107,20 @@ const AIAssistantModal = ({ onClose }) => {
         setParsedData(null);
 
         try {
-            const result = await parseTransactionWithGemini(textToAnalyze);
+            const result = await parseTransactionWithGemini(textToAnalyze, transactions);
+
+            if (result.conversational_response) {
+                speak(result.conversational_response);
+            }
+
+            if (result.intent === 'query') {
+                setParsedData({ ...result, isQuery: true });
+                setIsLoading(false);
+                return;
+            }
+
             setParsedData(result);
 
-            // Use the AI's conversational response if available, otherwise fallback
-            const feedback = result.conversational_response || `Added ${result.amount} ${result.currency || 'lei'} for ${result.category}`;
-            speak(feedback);
-
-            // Clear any existing timer
             if (timerRef.current) {
                 clearInterval(timerRef.current);
                 timerRef.current = null;
@@ -150,8 +144,8 @@ const AIAssistantModal = ({ onClose }) => {
             setAutoSubmitTimer(timer);
 
         } catch (err) {
-            setError(err.message || "Could not understand. Try being more specific.");
-            speak("I couldn't understand that. Please try again.");
+            setError(err.message || "Could not understand.");
+            speak("I couldn't understand that.");
         } finally {
             setIsLoading(false);
         }
@@ -165,7 +159,6 @@ const AIAssistantModal = ({ onClose }) => {
             timerRef.current = null;
         }
         setAutoSubmitTimer(null);
-
         isSubmittingRef.current = true;
 
         try {
@@ -196,10 +189,9 @@ const AIAssistantModal = ({ onClose }) => {
     };
 
     useEffect(() => {
-        // Auto-start listening when modal opens
         const timer = setTimeout(() => {
             startListening();
-        }, 500); // Small delay for animation smoothness
+        }, 500);
 
         return () => {
             clearTimeout(timer);
@@ -212,123 +204,85 @@ const AIAssistantModal = ({ onClose }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-            <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+            {/* Minimalist Backdrop */}
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={onClose} />
 
             <motion.div
-                initial={{ opacity: 0, y: 100, scale: 0.95 }}
+                initial={{ opacity: 0, y: 50, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 100, scale: 0.95 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="relative w-full md:w-[480px] bg-gradient-to-b from-slate-900 to-black md:rounded-[2rem] rounded-t-[2rem] p-8 shadow-2xl shadow-blue-500/10 border border-white/10 overflow-hidden"
+                exit={{ opacity: 0, y: 50, scale: 0.95 }}
+                transition={{ type: "spring", damping: 30, stiffness: 400 }}
+                className="relative w-full md:w-[500px] overflow-hidden bg-slate-900/80 backdrop-blur-2xl md:rounded-[2rem] rounded-t-[2rem] shadow-2xl border border-white/10"
             >
-                {/* Fintech Glow Background */}
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-blue-600/10 to-transparent pointer-events-none" />
-                <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/20 blur-[80px] pointer-events-none" />
-
                 {/* Header */}
-                <div className="relative z-10 flex items-center justify-between mb-10">
+                <div className="relative z-20 flex items-center justify-between p-6 pb-2">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                            <Bot size={20} className="text-blue-400" />
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-white/20 blur-md group-hover:bg-white/30 transition-colors" />
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 text-white">
+                                <circle cx="12" cy="12" r="4" fill="currentColor" />
+                                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.5" />
+                                <path d="M12 2V5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                <path d="M12 19V22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                <path d="M2 12H5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                <path d="M19 12H22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
                         </div>
                         <div>
-                            <h2 className="text-lg font-semibold text-white tracking-tight">Kore Assistant</h2>
-                            <p className="text-xs text-slate-400 font-medium">AI Financial Agent</p>
+                            <h2 className="text-lg font-semibold text-white tracking-tight">Kore Agent</h2>
+                            <p className="text-xs text-slate-400 font-medium">Financial Intelligence</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-slate-500 hover:text-white transition-colors">
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Main Content */}
-                <div className="relative z-10 min-h-[300px] flex flex-col justify-center">
+                {/* Content Area */}
+                <div className="relative z-10 p-6 pt-4 min-h-[350px] flex flex-col">
 
                     {!parsedData ? (
-                        <div className="flex flex-col items-center space-y-12">
-                            {/* Digital Pulse Visualizer */}
-                            <div className="relative h-32 flex items-center justify-center w-full">
+                        <div className="flex-1 flex flex-col items-center justify-center space-y-8">
+
+                            {/* Visualizer Container - No Background, Just Clouds */}
+                            <div className="relative w-full h-48 flex items-center justify-center">
                                 {isListening ? (
-                                    <div className="flex items-center justify-center gap-1 h-full">
-                                        {[...Array(7)].map((_, i) => (
-                                            <motion.div
-                                                key={i}
-                                                animate={{
-                                                    height: [20, 40 + Math.random() * 60, 20],
-                                                    opacity: [0.5, 1, 0.5]
-                                                }}
-                                                transition={{
-                                                    repeat: Infinity,
-                                                    duration: 0.5,
-                                                    delay: i * 0.05,
-                                                    ease: "easeInOut"
-                                                }}
-                                                className="w-1.5 bg-blue-400 rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]"
-                                            />
-                                        ))}
+                                    <div className="absolute inset-0 scale-150 opacity-80">
+                                        <VoiceVisualizer isListening={isListening} />
                                     </div>
                                 ) : (
-                                    <motion.div
+                                    <motion.button
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
                                         onClick={startListening}
-                                        className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.3)] cursor-pointer group relative border border-white/10"
+                                        className="relative z-10 w-20 h-20 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center group shadow-xl shadow-black/20"
                                     >
-                                        <div className="absolute inset-0 rounded-2xl bg-white/20 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        <Mic size={32} className="text-white" />
-                                    </motion.div>
+                                        <Mic size={32} className="text-white opacity-80 group-hover:opacity-100 transition-opacity" />
+                                    </motion.button>
                                 )}
                             </div>
 
-                            <div className="w-full space-y-8 text-center">
+                            {/* Status Text */}
+                            <div className="text-center space-y-6 relative z-20">
                                 <AnimatePresence mode="wait">
-                                    <motion.div
+                                    <motion.p
                                         key={isListening ? "listening" : "idle"}
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -10 }}
-                                        className="space-y-2"
+                                        className="text-2xl font-light text-white tracking-tight"
                                     >
-                                        <p className="text-2xl font-medium text-white tracking-tight">
-                                            {isListening ? "Listening..." : (input || "How can I help?")}
-                                        </p>
-                                        {isListening && (
-                                            <p className="text-sm text-blue-400 font-medium animate-pulse">
-                                                Processing voice input
-                                            </p>
-                                        )}
-                                    </motion.div>
+                                        {isListening ? "Listening..." : (input || "How can I help?")}
+                                    </motion.p>
                                 </AnimatePresence>
 
-                                {/* Manual Input */}
-                                {!isListening && (
-                                    <form onSubmit={handleAnalyze} className="relative max-w-sm mx-auto">
-                                        <input
-                                            type="text"
-                                            value={input}
-                                            onChange={(e) => setInput(e.target.value)}
-                                            placeholder="Type a command..."
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-5 pr-12 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all"
-                                        />
-                                        <button
-                                            type="submit"
-                                            disabled={isLoading || !input.trim()}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500 transition-all disabled:opacity-0 shadow-lg shadow-blue-600/20"
-                                        >
-                                            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                                        </button>
-                                    </form>
-                                )}
-
-                                {/* Keyboard Toggle (Only when listening) */}
+                                {/* Keyboard Toggle - Always visible when listening to allow switching */}
                                 {isListening && (
                                     <motion.button
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        onClick={() => {
-                                            setIsListening(false);
-                                        }}
-                                        className="mt-8 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-sm transition-colors border border-white/5 mx-auto font-medium"
+                                        onClick={() => setIsListening(false)}
+                                        className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-all border border-white/10 mx-auto backdrop-blur-md"
                                     >
                                         <Keyboard size={16} />
                                         <span>Type instead</span>
@@ -336,55 +290,93 @@ const AIAssistantModal = ({ onClose }) => {
                                 )}
                             </div>
 
-                            {error && <p className="text-rose-400 text-sm font-medium bg-rose-500/10 px-4 py-2 rounded-lg border border-rose-500/20">{error}</p>}
+                            {/* Manual Input */}
+                            {!isListening && (
+                                <form onSubmit={handleAnalyze} className="w-full relative z-20">
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={input}
+                                            onChange={(e) => setInput(e.target.value)}
+                                            placeholder="Ask anything..."
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-5 pr-12 text-white placeholder-slate-500 focus:outline-none focus:bg-white/10 focus:border-white/20 transition-all shadow-inner"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={isLoading || !input.trim()}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all disabled:opacity-0"
+                                        >
+                                            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
                         </div>
-                    ) : (
-                        // Result Card - Receipt Style
+                    ) : parsedData.isQuery ? (
+                        // Query Result - Glass Card
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="space-y-6"
+                            className="flex-1 flex flex-col items-center justify-center space-y-6"
                         >
-                            <div className="bg-white rounded-[1.5rem] p-1 overflow-hidden shadow-2xl shadow-black/50">
-                                <div className="bg-slate-50 rounded-[1.3rem] p-6 space-y-6 relative overflow-hidden border border-slate-200">
+                            <div className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-8 text-center shadow-xl">
+                                <p className="text-xl text-white font-light leading-relaxed">
+                                    "{parsedData.conversational_response}"
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setParsedData(null);
+                                    setInput('');
+                                }}
+                                className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+                            >
+                                Ask Another Question
+                            </button>
+                        </motion.div>
+                    ) : (
+                        // Transaction Confirmation - MacOS Widget Style
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex-1 flex flex-col justify-center space-y-6"
+                        >
+                            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2rem] p-1 shadow-2xl">
+                                <div className="bg-slate-900/50 rounded-[1.8rem] p-6 space-y-6 relative overflow-hidden">
                                     {/* Progress Bar */}
                                     {autoSubmitTimer && (
                                         <motion.div
                                             initial={{ width: "100%" }}
                                             animate={{ width: "0%" }}
                                             transition={{ duration: 3, ease: "linear" }}
-                                            className="absolute top-0 left-0 h-1 bg-blue-600"
+                                            className="absolute top-0 left-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"
                                         />
                                     )}
 
                                     <div className="flex justify-between items-start">
-                                        <div className="space-y-1">
-                                            <span className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Transaction</span>
-                                            <p className="text-slate-900 text-lg font-semibold leading-tight">"{parsedData.note}"</p>
+                                        <div>
+                                            <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">New Transaction</span>
+                                            <p className="text-white text-xl font-medium mt-1">{parsedData.note}</p>
                                         </div>
-                                        <div className={`p-2 rounded-xl ${parsedData.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                                            <Activity size={20} />
-                                        </div>
-                                    </div>
-
-                                    <div className="py-6 border-y border-dashed border-slate-200 flex flex-col items-center justify-center space-y-1">
-                                        <span className="text-slate-400 text-xs font-medium">Total Amount</span>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-4xl font-bold text-slate-900 tracking-tight">
-                                                {parsedData.amount}
-                                            </span>
-                                            <span className="text-lg text-slate-500 font-medium">lei</span>
+                                        <div className={`p-2.5 rounded-2xl ${parsedData.type === 'income' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                            <Activity size={24} />
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between text-sm">
-                                        <div className="flex items-center gap-2 text-slate-600">
-                                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
-                                                <Bot size={14} />
-                                            </div>
-                                            <span className="font-medium">{parsedData.category}</span>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-5xl font-light text-white tracking-tight">
+                                            {parsedData.amount}
+                                        </span>
+                                        <span className="text-xl text-slate-400 font-light">lei</span>
+                                    </div>
+
+                                    <div className="flex items-center gap-3 text-sm text-slate-300 bg-white/5 p-3 rounded-xl">
+                                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                                            <Bot size={16} />
                                         </div>
-                                        <span className="text-slate-400 font-medium">{parsedData.date}</span>
+                                        <span className="font-medium">{parsedData.category}</span>
+                                        <span className="text-slate-500 mx-1">•</span>
+                                        <span className="text-slate-400">{parsedData.date}</span>
                                     </div>
                                 </div>
                             </div>
@@ -396,21 +388,15 @@ const AIAssistantModal = ({ onClose }) => {
                                         setParsedData(null);
                                         setInput('');
                                     }}
-                                    className="flex-1 py-3.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium transition-colors flex items-center justify-center gap-2 border border-white/5"
+                                    className="flex-1 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors"
                                 >
-                                    <Undo2 size={18} />
                                     Cancel
                                 </button>
                                 <button
                                     onClick={() => handleConfirm()}
-                                    className="flex-1 py-3.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
+                                    className="flex-1 py-4 rounded-2xl bg-white text-black font-semibold hover:bg-slate-200 transition-colors shadow-lg shadow-white/10"
                                 >
-                                    {autoSubmitTimer ? `Saving (${countdown})...` : (
-                                        <>
-                                            <Check size={18} strokeWidth={2.5} />
-                                            Confirm
-                                        </>
-                                    )}
+                                    {autoSubmitTimer ? `Saving (${countdown})...` : "Confirm"}
                                 </button>
                             </div>
                         </motion.div>
@@ -422,3 +408,4 @@ const AIAssistantModal = ({ onClose }) => {
 };
 
 export { AIAssistantModal };
+

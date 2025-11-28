@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import { TransactionContext } from '../context/TransactionContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { getRelativeDateLabel } from '../utils/date';
-import { Coffee, Home, Briefcase, Car, Smartphone, ShoppingCart, Utensils, Zap, Film, MoreHorizontal, Filter } from 'lucide-react';
+import { Coffee, Home, Briefcase, Car, Smartphone, ShoppingCart, Utensils, Zap, Film, MoreHorizontal, Filter, Trash2 } from 'lucide-react';
 
 const CATEGORY_ICONS = {
     Food: Utensils,
@@ -66,58 +66,85 @@ const TransactionList = () => {
             </div>
 
             {sortedDates.length > 0 ? (
-                <div className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-6 md:p-8 shadow-2xl shadow-black/20">
-                    <div className="space-y-10">
-                        {sortedDates.map(date => (
-                            <div key={date}>
-                                <h3 className="text-xs font-bold tracking-widest uppercase text-slate-500 mb-6 pl-2 border-l-2 border-indigo-500/30">
-                                    {getRelativeDateLabel(date)}
-                                </h3>
-                                <div className="space-y-4">
-                                    {groupedTransactions[date].map((transaction, index) => {
-                                        const Icon = CATEGORY_ICONS[transaction.category] || MoreHorizontal;
-                                        const isExpense = transaction.type === 'expense';
+                <div className="space-y-8">
+                    {sortedDates.map(date => (
+                        <div key={date}>
+                            <h3 className="text-xs font-bold tracking-widest uppercase text-slate-500 mb-4 pl-2 border-l-2 border-indigo-500/30">
+                                {getRelativeDateLabel(date)}
+                            </h3>
+                            <div className="space-y-3">
+                                {groupedTransactions[date].map((transaction, index) => {
+                                    const Icon = CATEGORY_ICONS[transaction.category] || MoreHorizontal;
+                                    const isExpense = transaction.type === 'expense';
 
-                                        return (
-                                            <div
-                                                key={transaction.id}
-                                                className="group flex items-center justify-between p-4 rounded-2xl hover:bg-white/5 transition-all duration-300 cursor-default border border-transparent hover:border-white/5 relative overflow-hidden"
-                                                style={{ animationDelay: `${index * 50}ms` }}
-                                            >
-                                                <div className="flex items-center gap-4 md:gap-5 min-w-0 flex-1">
-                                                    <div className={`p-3 rounded-xl bg-white/5 text-slate-400 group-hover:text-white group-hover:bg-white/10 transition-all duration-300 shadow-inner shadow-white/5 flex-shrink-0`}>
-                                                        <Icon size={20} strokeWidth={1.5} />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1 pr-2">
-                                                        <p className="font-medium text-slate-200 text-base tracking-wide truncate">{transaction.category}</p>
+                                    return (
+                                        <div
+                                            key={transaction.id}
+                                            className="group relative overflow-hidden rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all duration-300"
+                                            style={{ animationDelay: `${index * 50}ms` }}
+                                        >
+                                            <div className="p-4 flex items-center gap-4">
+                                                {/* Icon */}
+                                                <div className={`p-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 text-slate-300 shadow-inner border border-white/5 flex-shrink-0`}>
+                                                    <Icon size={20} strokeWidth={1.5} />
+                                                </div>
+
+                                                {/* Content Container */}
+                                                <div className="flex-1 min-w-0 flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+                                                    {/* Category & Note */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between md:justify-start gap-2">
+                                                            <p className="font-medium text-slate-200 text-base tracking-wide truncate">
+                                                                {transaction.category}
+                                                            </p>
+                                                            {/* Mobile Amount (Visible on top row) */}
+                                                            <p className={`md:hidden font-medium text-base tracking-wider ${isExpense ? 'text-slate-200' : 'text-emerald-400'}`}>
+                                                                {isExpense ? '-' : '+'}{formatAmount(Math.abs(transaction.amount))}
+                                                            </p>
+                                                        </div>
                                                         {transaction.note && (
-                                                            <p className="text-xs text-slate-500 font-light mt-0.5 truncate">{transaction.note}</p>
+                                                            <p className="text-xs text-slate-500 font-light truncate mt-0.5 md:mt-0">
+                                                                {transaction.note}
+                                                            </p>
                                                         )}
                                                     </div>
-                                                </div>
-                                                <div className="text-right flex items-center gap-3 md:gap-4 flex-shrink-0">
-                                                    <p className={`font-light text-lg tracking-wider whitespace-nowrap ${isExpense ? 'text-slate-200' : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]'}`}>
-                                                        {isExpense ? '-' : '+'}{formatAmount(Math.abs(transaction.amount))}
-                                                    </p>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            deleteTransaction(transaction.id);
-                                                        }}
-                                                        className="p-2 -mr-2 md:mr-0 text-rose-400/50 hover:text-rose-400 md:opacity-0 md:group-hover:opacity-100 transition-all"
-                                                        aria-label="Delete transaction"
-                                                    >
-                                                        <span className="md:hidden text-xs uppercase tracking-wider font-medium">Del</span>
-                                                        <span className="hidden md:inline text-xs uppercase tracking-wider">Delete</span>
-                                                    </button>
+
+                                                    {/* Desktop Amount & Actions */}
+                                                    <div className="hidden md:flex items-center gap-6">
+                                                        <p className={`font-light text-lg tracking-wider ${isExpense ? 'text-slate-200' : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]'}`}>
+                                                            {isExpense ? '-' : '+'}{formatAmount(Math.abs(transaction.amount))}
+                                                        </p>
+
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                deleteTransaction(transaction.id);
+                                                            }}
+                                                            className="p-2 rounded-lg hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Delete Transaction"
+                                                        >
+                                                            <Trash2 size={18} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
+
+                                            {/* Mobile Delete Button (Swipe-like absolute position) */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteTransaction(transaction.id);
+                                                }}
+                                                className="md:hidden absolute top-0 right-0 bottom-0 w-16 bg-gradient-to-l from-rose-500/20 to-transparent flex items-center justify-center text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ))}
                 </div>
             ) : (
                 <div className="text-center py-24 opacity-50 bg-slate-900/20 rounded-[2.5rem] border border-white/5">

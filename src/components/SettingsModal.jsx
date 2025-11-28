@@ -129,6 +129,8 @@ const SettingsModal = ({ onClose }) => {
                                         <div className="grid grid-cols-2 gap-3 md:gap-4">
                                             {wallpapers.map((file) => {
                                                 const url = storage.getFileView(WALLPAPER_BUCKET_ID, file.$id);
+                                                // Use optimized preview for thumbnails (300x170, 50% quality)
+                                                const previewUrl = storage.getFilePreview(WALLPAPER_BUCKET_ID, file.$id, 300, 170, 'center', 50);
                                                 const isSelected = wallpaperUrl === url && !isAutoRotating;
 
                                                 return (
@@ -140,7 +142,7 @@ const SettingsModal = ({ onClose }) => {
                                                         className={`relative aspect-video rounded-xl overflow-hidden border-2 transition-all duration-300 group ${isSelected ? 'border-indigo-500 shadow-lg shadow-indigo-500/30' : 'border-transparent hover:border-white/20'}`}
                                                     >
                                                         <img
-                                                            src={url}
+                                                            src={previewUrl}
                                                             alt={file.name}
                                                             className="w-full h-full object-cover"
                                                             loading="lazy"
