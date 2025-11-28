@@ -6,6 +6,7 @@ import { useWallpaper } from '../context/WallpaperContext';
 import { TransactionContext } from '../context/TransactionContext';
 import { storage, WALLPAPER_BUCKET_ID } from '../lib/appwrite';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ExportButtons } from './ExportButtons';
 
 const SettingsModal = ({ onClose }) => {
     const { user, logout } = useAuth();
@@ -190,6 +191,20 @@ const SettingsModal = ({ onClose }) => {
                                                     </div>
                                                 </button>
                                             ))}
+                                        </div>
+                                    </section>
+
+                                    {/* Data Management Section */}
+                                    <section className="space-y-3 md:space-y-4">
+                                        <h4 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wider pl-1">Data Management</h4>
+                                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div>
+                                                    <h5 className="text-sm md:text-base font-semibold text-white">Export Data</h5>
+                                                    <p className="text-xs md:text-sm text-slate-400">Download your transaction history</p>
+                                                </div>
+                                            </div>
+                                            <ExportButtons transactions={transactions} />
                                         </div>
                                     </section>
                                 </div>
