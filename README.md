@@ -1,38 +1,54 @@
-# Kore - Smart Finance Tracker 💸
+# Kore - Financial Intelligence 💎
 
-Kore is a modern, high-performance budget tracking application built with **React**, **Vite**, and **Appwrite**. It features a stunning glassmorphic UI, real-time data synchronization, and dynamic wallpaper customization.
+> **The future of personal finance tracking.** Experience a stunning, AI-powered financial companion that blends MacOS aesthetics with cutting-edge web technology.
 
-![Kore Dashboard](https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=2000&auto=format&fit=crop)
+![Kore Banner](https://images.unsplash.com/photo-1639815188546-c43c240ff4df?q=80&w=2000&auto=format&fit=crop)
 
-## ✨ Features
+## 🌟 Overview
 
--   **📊 Interactive Dashboard**: Visualize your spending with beautiful Area Charts and Donut graphs (powered by Recharts).
--   **💰 Transaction Management**: Add, edit, and categorize income and expenses with ease.
--   **🎨 Dynamic Wallpapers**:
-    -   Fetch high-quality wallpapers from Appwrite Storage.
-    -   **Auto-Rotate Mode**: Refreshes your background every minute.
-    -   **Manual Selection**: Choose your favorite backdrop from the settings.
--   **🌍 Multi-Currency Support**: Switch between USD, EUR, GBP, JPY, and more with real-time UI updates.
--   **🔐 Secure Authentication**: Powered by Appwrite Auth for secure sign-up and login.
--   **🤖 Kore Assistant**:
-    -   **Voice-Activated**: Log transactions simply by speaking (e.g., "Spent 50 lei on pizza").
-    -   **Smart Parsing**: Powered by Google Gemini AI to automatically extract amount, category, and date.
-    -   **Gemini Live Aesthetic**: A stunning, deep-space visualizer that reacts to your voice in real-time.
--   **📱 Fully Responsive**: Works seamlessly on desktop, tablet, and mobile devices.
+**Kore** is not just a budget tracker; it's an intelligent financial agent. Built with **React**, **Vite**, and **Appwrite**, it offers a seamless, privacy-focused experience that works offline and installs as a native app (PWA).
+
+With its "Glassmorphism" design language, fluid animations, and the powerful **Kore Agent** (powered by Google Gemini), managing your money feels less like a chore and more like interacting with the future.
+
+## ✨ Key Features
+
+### 🧠 Kore Agent (AI Assistant)
+-   **Natural Voice Control**: Just say *"Spent $15 on coffee"* and watch it happen.
+-   **Smart Parsing**: Powered by **Google Gemini**, it understands context, dates, and categories instantly.
+-   **Dynamic Visualizer**: Features a mesmerizing, real-time "Cloud" visualizer that reacts to your voice.
+-   **Financial Insights**: Ask questions like *"How much did I spend on food last month?"* and get instant, conversational answers.
+
+### 🎨 Stunning UI/UX
+-   **MacOS Glass Aesthetic**: Deep blurs, translucent cards, and subtle gradients create a premium feel.
+-   **Fluid Animations**: Powered by **Framer Motion**, every interaction is smooth and responsive.
+-   **Dynamic Wallpapers**: The app adapts to your style with auto-rotating, high-quality backgrounds from Unsplash.
+
+### 📱 Mobile-First & PWA
+-   **Installable**: Add to your home screen for a native app experience.
+-   **Offline Capable**: View your data even without an internet connection.
+-   **Haptic Feedback**: Satisfying tactile responses for interactions (on supported devices).
+
+### 📊 Powerful Analytics
+-   **Interactive Charts**: Visualize spending trends with Recharts.
+-   **Multi-Currency**: Real-time conversion and support for USD, EUR, GBP, RON, and more.
+-   **Export Data**: Download your transaction history as PDF or CSV with a single click.
 
 ## 🛠️ Tech Stack
 
--   **Frontend**: React, Vite, Tailwind CSS, Framer Motion
--   **Backend**: Appwrite (Auth, Database, Storage)
--   **Icons**: Lucide React
--   **Charts**: Recharts
+-   **Frontend**: [React](https://reactjs.org/), [Vite](https://vitejs.dev/)
+-   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+-   **Animations**: [Framer Motion](https://www.framer.com/motion/)
+-   **Backend & Auth**: [Appwrite](https://appwrite.io/)
+-   **AI Intelligence**: [Google Gemini API](https://deepmind.google/technologies/gemini/)
+-   **Charts**: [Recharts](https://recharts.org/)
+-   **Icons**: [Lucide React](https://lucide.dev/)
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-
--   Node.js (v16+)
--   Appwrite Account & Project
+-   Node.js (v18+)
+-   Appwrite Account (Cloud or Self-Hosted)
+-   Google Gemini API Key
 
 ### Installation
 
@@ -47,8 +63,8 @@ Kore is a modern, high-performance budget tracking application built with **Reac
     npm install
     ```
 
-3.  **Configure Environment Variables**
-    Create a `.env` file in the root directory and add your Appwrite credentials:
+3.  **Configure Environment**
+    Create a `.env` file in the root directory:
     ```env
     VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
     VITE_APPWRITE_PROJECT_ID=your_project_id
@@ -58,15 +74,22 @@ Kore is a modern, high-performance budget tracking application built with **Reac
     VITE_GEMINI_API_KEY=your_gemini_api_key
     ```
 
-4.  **Run the development server**
+4.  **Run Development Server**
     ```bash
     npm run dev
     ```
 
-## 🤝 Contributing
+## 📱 PWA Setup
+To test the PWA functionality locally:
+1.  Build the app: `npm run build`
+2.  Preview the build: `npm run preview`
+3.  Open in browser and look for the "Install" icon in the address bar.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 🤝 Contributing
+Contributions are welcome! Please fork the repository and submit a Pull Request.
 
 ## 📄 License
-
 This project is licensed under the MIT License.
+
+---
+*Crafted with ❤️ by the Kore Team*
