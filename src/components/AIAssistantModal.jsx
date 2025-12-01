@@ -49,6 +49,8 @@ const AIAssistantModal = ({ onClose }) => {
         window.speechSynthesis.speak(utterance);
     };
 
+    const recognitionRef = useRef(null);
+
     const startListening = () => {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
             setError("Voice input is not supported.");
@@ -57,27 +59,17 @@ const AIAssistantModal = ({ onClose }) => {
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
 
         recognition.continuous = false;
         recognition.interimResults = true;
         recognition.lang = 'ro-RO';
-
-        // Silence detection timer
-        let silenceTimer = null;
-
-        const resetSilenceTimer = () => {
-            if (silenceTimer) clearTimeout(silenceTimer);
-            silenceTimer = setTimeout(() => {
-                recognition.stop();
-            }, 1500); // 1.5s silence timeout
-        };
 
         recognition.onstart = () => {
             setIsListening(true);
             setError('');
             setInput('');
             transcriptRef.current = '';
-            resetSilenceTimer();
         };
 
         recognition.onresult = (event) => {
@@ -87,27 +79,31 @@ const AIAssistantModal = ({ onClose }) => {
                 .join('');
             setInput(transcript);
             transcriptRef.current = transcript;
-            resetSilenceTimer(); // Reset timer on every word
         };
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error", event.error);
             setIsListening(false);
-            if (silenceTimer) clearTimeout(silenceTimer);
             if (event.error === 'no-speech') {
-                setError("Didn't hear anything. Try again.");
+                setError("Nu am auzit nimic. Încearcă din nou.");
             }
         };
 
         recognition.onend = () => {
             setIsListening(false);
-            if (silenceTimer) clearTimeout(silenceTimer);
             if (transcriptRef.current.trim()) {
                 handleAnalyze(null, transcriptRef.current);
             }
         };
 
         recognition.start();
+    };
+
+    const stopListening = () => {
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+        }
     };
 
     const handleAnalyze = async (e, overrideInput = null) => {
@@ -261,8 +257,20 @@ const AIAssistantModal = ({ onClose }) => {
                             {/* Visualizer Container - No Background, Just Clouds */}
                             <div className="relative w-full h-48 flex items-center justify-center">
                                 {isListening ? (
-                                    <div className="absolute inset-0 scale-150 opacity-80">
-                                        <VoiceVisualizer isListening={isListening} />
+                                    <div className="relative w-full h-full flex items-center justify-center">
+                                        <div className="absolute inset-0 scale-150 opacity-80 pointer-events-none">
+                                            <VoiceVisualizer isListening={isListening} />
+                                        </div>
+                                        {/* Manual Stop Button for Mobile */}
+                                        <motion.button
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={stopListening}
+                                            className="relative z-20 w-16 h-16 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/50 flex items-center justify-center group shadow-xl shadow-red-500/10"
+                                        >
+                                            <div className="w-6 h-6 rounded-md bg-red-500 shadow-lg shadow-red-500/50" />
+                                        </motion.button>
                                     </div>
                                 ) : (
                                     <motion.button

@@ -18,8 +18,8 @@ export const parseTransactionWithGemini = async (text, history = []) => {
         throw new Error("Gemini API is not configured. Please check your settings.");
     }
 
-    // Limit history to 20 items to reduce token count significantly
-    const recentHistory = history.slice(0, 20).map(t => ({
+    // Limit history to 15 items and minimize keys for maximum mobile speed
+    const recentHistory = history.slice(0, 15).map(t => ({
         d: t.date,
         a: t.amount,
         c: t.category,
@@ -32,32 +32,32 @@ export const parseTransactionWithGemini = async (text, history = []) => {
     Hist:${JSON.stringify(recentHistory)}
     In:"${text}"
 
-    Role:Financial Assistant. Analyze "In" & determine INTENT.
+    Role:Financial Assistant. Lang:Romanian.
 
     INTENT:ADD
-    Trig:Expense/Income log.
+    Trig:Expense/Income log (e.g. "Am cheltuit 50 lei pe pizza").
     Out JSON:
     {
         "intent": "add",
         "type": "expense"|"income",
         "amount": number,
         "category": "Food"|"Rent"|"Salary"|"Transport"|"Shopping"|"Utilities"|"Entertainment"|"Other",
-        "note": "desc",
+        "note": "desc (in RO)",
         "date": "YYYY-MM-DD",
-        "conversational_response": "Added..."
+        "conversational_response": "Adăugat 50 lei pentru pizza."
     }
 
     INTENT:QUERY
-    Trig:Finances question.
+    Trig:Finances question (e.g. "Cât am cheltuit pe mâncare?").
     Action:Analyze "Hist".
     Out JSON:
     {
         "intent": "query",
-        "conversational_response": "Answer..."
+        "conversational_response": "Ai cheltuit 450 lei pe Mâncare luna asta."
     }
 
     Rules:
-    1.QUERY:Concise.
+    1.Response MUST be in Romanian.
     2.ADD:Default "expense".
     3.JSON ONLY.
     `;
