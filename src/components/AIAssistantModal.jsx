@@ -191,7 +191,7 @@ const AIAssistantModal = ({ onClose }) => {
     useEffect(() => {
         const timer = setTimeout(() => {
             startListening();
-        }, 500);
+        }, 100);
 
         return () => {
             clearTimeout(timer);

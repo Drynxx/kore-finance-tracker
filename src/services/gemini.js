@@ -8,7 +8,7 @@ let model = null;
 
 if (API_KEY) {
     genAI = new GoogleGenerativeAI(API_KEY);
-    model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 } else {
     console.error("Gemini API Key is missing! Make sure VITE_GEMINI_API_KEY is set in .env");
 }
@@ -18,51 +18,48 @@ export const parseTransactionWithGemini = async (text, history = []) => {
         throw new Error("Gemini API is not configured. Please check your settings.");
     }
 
-    // Prepare history context (limit to last 50 transactions to save tokens/latency)
-    const recentHistory = history.slice(0, 50).map(t => ({
-        date: t.date,
-        amount: t.amount,
-        category: t.category,
-        note: t.note,
-        type: t.type
+    // Limit history to 20 items to reduce token count significantly
+    const recentHistory = history.slice(0, 20).map(t => ({
+        d: t.date,
+        a: t.amount,
+        c: t.category,
+        n: t.note,
+        t: t.type
     }));
 
     const prompt = `
-    Current Date: ${new Date().toISOString().split('T')[0]}
-    Transaction History: ${JSON.stringify(recentHistory)}
-    User Input: "${text}"
+    Date:${new Date().toISOString().split('T')[0]}
+    Hist:${JSON.stringify(recentHistory)}
+    In:"${text}"
 
-    You are a smart financial assistant. Analyze the User Input and determine the INTENT.
+    Role:Financial Assistant. Analyze "In" & determine INTENT.
 
-    ---
-    INTENT 1: ADD_TRANSACTION
-    Trigger: User wants to log an expense or income (e.g., "Spent 50 on pizza", "Salary came in").
-    Output JSON:
+    INTENT:ADD
+    Trig:Expense/Income log.
+    Out JSON:
     {
         "intent": "add",
-        "type": "expense" | "income",
+        "type": "expense"|"income",
         "amount": number,
-        "category": "Food" | "Rent" | "Salary" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Other",
-        "note": "short description",
+        "category": "Food"|"Rent"|"Salary"|"Transport"|"Shopping"|"Utilities"|"Entertainment"|"Other",
+        "note": "desc",
         "date": "YYYY-MM-DD",
-        "conversational_response": "Added 50 lei for pizza."
+        "conversational_response": "Added..."
     }
 
-    ---
-    INTENT 2: QUERY
-    Trigger: User asks a question about their finances (e.g., "How much did I spend on food?", "What was my biggest expense?", "Total income?").
-    Action: Analyze the "Transaction History" provided above to answer the question accurately.
-    Output JSON:
+    INTENT:QUERY
+    Trig:Finances question.
+    Action:Analyze "Hist".
+    Out JSON:
     {
         "intent": "query",
-        "conversational_response": "You spent a total of 450 lei on Food this month. Your biggest expense was 200 lei for Groceries."
+        "conversational_response": "Answer..."
     }
 
-    ---
     Rules:
-    1. For QUERY, be concise, professional, and helpful. Do not hallucinate data not in the history.
-    2. For ADD, default to "expense" if unclear.
-    3. Output STRICTLY valid JSON.
+    1.QUERY:Concise.
+    2.ADD:Default "expense".
+    3.JSON ONLY.
     `;
 
     try {
