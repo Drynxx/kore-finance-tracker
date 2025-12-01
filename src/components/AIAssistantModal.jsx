@@ -62,11 +62,22 @@ const AIAssistantModal = ({ onClose }) => {
         recognition.interimResults = true;
         recognition.lang = 'ro-RO';
 
+        // Silence detection timer
+        let silenceTimer = null;
+
+        const resetSilenceTimer = () => {
+            if (silenceTimer) clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(() => {
+                recognition.stop();
+            }, 1500); // 1.5s silence timeout
+        };
+
         recognition.onstart = () => {
             setIsListening(true);
             setError('');
             setInput('');
             transcriptRef.current = '';
+            resetSilenceTimer();
         };
 
         recognition.onresult = (event) => {
@@ -76,11 +87,13 @@ const AIAssistantModal = ({ onClose }) => {
                 .join('');
             setInput(transcript);
             transcriptRef.current = transcript;
+            resetSilenceTimer(); // Reset timer on every word
         };
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error", event.error);
             setIsListening(false);
+            if (silenceTimer) clearTimeout(silenceTimer);
             if (event.error === 'no-speech') {
                 setError("Didn't hear anything. Try again.");
             }
@@ -88,6 +101,7 @@ const AIAssistantModal = ({ onClose }) => {
 
         recognition.onend = () => {
             setIsListening(false);
+            if (silenceTimer) clearTimeout(silenceTimer);
             if (transcriptRef.current.trim()) {
                 handleAnalyze(null, transcriptRef.current);
             }
