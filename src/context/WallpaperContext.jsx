@@ -8,8 +8,15 @@ export const useWallpaper = () => useContext(WallpaperContext);
 export const WallpaperProvider = ({ children }) => {
     const [wallpaperUrl, setWallpaperUrl] = useState(null);
     const [wallpapers, setWallpapers] = useState([]);
-    const [isAutoRotating, setIsAutoRotating] = useState(true);
+    const [isAutoRotating, setIsAutoRotating] = useState(() => {
+        const saved = localStorage.getItem('isAutoRotating');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        localStorage.setItem('isAutoRotating', JSON.stringify(isAutoRotating));
+    }, [isAutoRotating]);
 
     useEffect(() => {
         if (!WALLPAPER_BUCKET_ID) {
