@@ -18,6 +18,8 @@ const AIAssistantModal = ({ onClose }) => {
     const timerRef = useRef(null);
     const isSubmittingRef = useRef(false);
 
+    const [language, setLanguage] = useState('ro-RO'); // Default to Romanian as per user context
+
     // TTS Helper
     const speak = (text) => {
         if ('speechSynthesis' in window) {
@@ -36,20 +38,36 @@ const AIAssistantModal = ({ onClose }) => {
     };
 
     const selectVoiceAndSpeak = (utterance, voices, text) => {
-        const roVoices = voices.filter(v => v.lang.includes('ro'));
-        const preferredVoice = roVoices.find(v => v.name.includes('Natural')) ||
-            roVoices.find(v => v.name.includes('Google')) ||
-            roVoices[0];
+        let preferredVoice;
+
+        if (language === 'ro-RO') {
+            preferredVoice = voices.find(v => v.lang.includes('ro')) || voices[0];
+        } else {
+            preferredVoice = voices.find(v => v.lang.includes('en-US') && v.name.includes('Google')) ||
+                voices.find(v => v.lang.includes('en')) ||
+                voices[0];
+        }
 
         if (preferredVoice) {
             utterance.voice = preferredVoice;
-            utterance.rate = 1.05;
+            utterance.rate = 1.0;
             utterance.pitch = 1.0;
         }
         window.speechSynthesis.speak(utterance);
     };
 
     const recognitionRef = useRef(null);
+    const silenceTimerRef = useRef(null);
+
+    const stopListening = () => {
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+        }
+        if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+        }
+        setIsListening(false);
+    };
 
     const startListening = () => {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -57,53 +75,69 @@ const AIAssistantModal = ({ onClose }) => {
             return;
         }
 
+        // Stop any existing instance
+        if (recognitionRef.current) {
+            recognitionRef.current.abort();
+        }
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
-        recognitionRef.current = recognition;
 
-        recognition.continuous = false;
+        recognition.continuous = false; // Mobile prefers false for short commands
         recognition.interimResults = true;
-        recognition.lang = 'ro-RO';
+        recognition.lang = language; // Dynamic language selection
 
         recognition.onstart = () => {
             setIsListening(true);
             setError('');
             setInput('');
             transcriptRef.current = '';
+
+            // Safety timeout: Stop if no speech detected after 5 seconds
+            silenceTimerRef.current = setTimeout(() => {
+                recognition.stop();
+            }, 5000);
         };
 
         recognition.onresult = (event) => {
+            // Clear silence timer on every result
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
             const transcript = Array.from(event.results)
                 .map(result => result[0])
                 .map(result => result.transcript)
                 .join('');
+
             setInput(transcript);
             transcriptRef.current = transcript;
+
+            // Set new silence timer: Stop 2 seconds after user stops speaking
+            silenceTimerRef.current = setTimeout(() => {
+                recognition.stop();
+            }, 2000);
         };
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error", event.error);
-            setIsListening(false);
             if (event.error === 'no-speech') {
-                setError("Nu am auzit nimic. Încearcă din nou.");
+                setError("Didn't hear anything.");
+            } else if (event.error === 'not-allowed') {
+                setError("Microphone access denied.");
             }
+            stopListening();
         };
 
         recognition.onend = () => {
             setIsListening(false);
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
             if (transcriptRef.current.trim()) {
                 handleAnalyze(null, transcriptRef.current);
             }
         };
 
+        recognitionRef.current = recognition;
         recognition.start();
-    };
-
-    const stopListening = () => {
-        if (recognitionRef.current) {
-            recognitionRef.current.stop();
-            setIsListening(false);
-        }
     };
 
     const handleAnalyze = async (e, overrideInput = null) => {
@@ -201,10 +235,11 @@ const AIAssistantModal = ({ onClose }) => {
     useEffect(() => {
         const timer = setTimeout(() => {
             startListening();
-        }, 100);
+        }, 500);
 
         return () => {
             clearTimeout(timer);
+            stopListening();
             if (timerRef.current) {
                 clearInterval(timerRef.current);
             }
@@ -240,7 +275,15 @@ const AIAssistantModal = ({ onClose }) => {
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold text-white tracking-tight">Kore Agent</h2>
-                            <p className="text-xs text-slate-400 font-medium">Financial Intelligence</p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs text-slate-400 font-medium">Financial Intelligence</p>
+                                <button
+                                    onClick={() => setLanguage(prev => prev === 'ro-RO' ? 'en-US' : 'ro-RO')}
+                                    className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-bold text-indigo-300 border border-white/10 hover:bg-white/20 transition-colors"
+                                >
+                                    {language === 'ro-RO' ? 'RO' : 'EN'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
@@ -257,20 +300,8 @@ const AIAssistantModal = ({ onClose }) => {
                             {/* Visualizer Container - No Background, Just Clouds */}
                             <div className="relative w-full h-48 flex items-center justify-center">
                                 {isListening ? (
-                                    <div className="relative w-full h-full flex items-center justify-center">
-                                        <div className="absolute inset-0 scale-150 opacity-80 pointer-events-none">
-                                            <VoiceVisualizer isListening={isListening} />
-                                        </div>
-                                        {/* Manual Stop Button for Mobile */}
-                                        <motion.button
-                                            initial={{ scale: 0 }}
-                                            animate={{ scale: 1 }}
-                                            whileTap={{ scale: 0.9 }}
-                                            onClick={stopListening}
-                                            className="relative z-20 w-16 h-16 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/50 flex items-center justify-center group shadow-xl shadow-red-500/10"
-                                        >
-                                            <div className="w-6 h-6 rounded-md bg-red-500 shadow-lg shadow-red-500/50" />
-                                        </motion.button>
+                                    <div className="absolute inset-0 scale-150 opacity-80">
+                                        <VoiceVisualizer isListening={isListening} />
                                     </div>
                                 ) : (
                                     <motion.button

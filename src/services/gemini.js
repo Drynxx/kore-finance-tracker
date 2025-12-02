@@ -8,7 +8,7 @@ let model = null;
 
 if (API_KEY) {
     genAI = new GoogleGenerativeAI(API_KEY);
-    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 } else {
     console.error("Gemini API Key is missing! Make sure VITE_GEMINI_API_KEY is set in .env");
 }
@@ -18,48 +18,55 @@ export const parseTransactionWithGemini = async (text, history = []) => {
         throw new Error("Gemini API is not configured. Please check your settings.");
     }
 
-    // Limit history to 15 items and minimize keys for maximum mobile speed
-    const recentHistory = history.slice(0, 15).map(t => ({
-        d: t.date,
-        a: t.amount,
-        c: t.category,
-        n: t.note,
-        t: t.type
+    // Prepare history context (limit to last 50 transactions to save tokens/latency)
+    const recentHistory = history.slice(0, 50).map(t => ({
+        date: t.date,
+        amount: t.amount,
+        category: t.category,
+        note: t.note,
+        type: t.type
     }));
 
     const prompt = `
-    Date:${new Date().toISOString().split('T')[0]}
-    Hist:${JSON.stringify(recentHistory)}
-    In:"${text}"
+    Current Date: ${new Date().toISOString().split('T')[0]}
+    Transaction History: ${JSON.stringify(recentHistory)}
+    User Input: "${text}"
 
-    Role:Financial Assistant. Lang:Romanian.
+    You are a smart financial assistant. Analyze the User Input and determine the INTENT.
+    The user may speak in English or Romanian.
+    If the input is in Romanian, the "conversational_response" MUST be in Romanian.
+    If the input is in English, the "conversational_response" MUST be in English.
 
-    INTENT:ADD
-    Trig:Expense/Income log (e.g. "Am cheltuit 50 lei pe pizza").
-    Out JSON:
+    ---
+    INTENT 1: ADD_TRANSACTION
+    Trigger: User wants to log an expense or income (e.g., "Spent 50 on pizza", "Salary came in", "Am cheltuit 50 lei pe pizza", "A intrat salariul").
+    Output JSON:
     {
         "intent": "add",
-        "type": "expense"|"income",
+        "type": "expense" | "income",
         "amount": number,
-        "category": "Food"|"Rent"|"Salary"|"Transport"|"Shopping"|"Utilities"|"Entertainment"|"Other",
-        "note": "desc (in RO)",
+        "category": "Food" | "Rent" | "Salary" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Other",
+        "note": "short description (keep original language)",
         "date": "YYYY-MM-DD",
-        "conversational_response": "Adăugat 50 lei pentru pizza."
+        "conversational_response": "Added 50 lei for pizza. / Am adăugat 50 lei pentru pizza."
     }
 
-    INTENT:QUERY
-    Trig:Finances question (e.g. "Cât am cheltuit pe mâncare?").
-    Action:Analyze "Hist".
-    Out JSON:
+    ---
+    INTENT 2: QUERY
+    Trigger: User asks a question about their finances (e.g., "How much did I spend on food?", "Cat am cheltuit pe mancare?").
+    Action: Analyze the "Transaction History" provided above to answer the question accurately.
+    Output JSON:
     {
         "intent": "query",
-        "conversational_response": "Ai cheltuit 450 lei pe Mâncare luna asta."
+        "conversational_response": "You spent a total of 450 lei on Food. / Ai cheltuit un total de 450 lei pe Mâncare."
     }
 
+    ---
     Rules:
-    1.Response MUST be in Romanian.
-    2.ADD:Default "expense".
-    3.JSON ONLY.
+    1. Detect the language of the "User Input".
+    2. Respond in the SAME language as the input.
+    3. For ADD, default to "expense" if unclear.
+    4. Output STRICTLY valid JSON.
     `;
 
     try {
