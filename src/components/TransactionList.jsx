@@ -44,7 +44,7 @@ const TransactionList = () => {
     return (
         <div className="space-y-8 pb-24 md:pb-0 animate-fade-in">
             {/* Header - Sticky Glass on Mobile */}
-            <div className="sticky top-0 z-20 -mx-4 px-6 py-4 bg-slate-900/80 backdrop-blur-xl border-b border-white/10 md:static md:bg-transparent md:backdrop-blur-none md:border-none md:p-0 md:mx-0 transition-all duration-300">
+            <div className="sticky top-0 z-20 -mx-4 px-6 py-4 bg-slate-900/20 backdrop-blur-xl border-b border-white/5 md:static md:bg-transparent md:backdrop-blur-none md:border-none md:p-0 md:mx-0 transition-all duration-300">
                 <div className="flex items-end justify-between">
                     <div>
                         <h2 className="text-2xl md:text-4xl font-sans font-bold text-white tracking-tight drop-shadow-lg">History</h2>

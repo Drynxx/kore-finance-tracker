@@ -84,3 +84,55 @@ export const parseTransactionWithGemini = async (text, history = []) => {
         throw new Error(`AI Error: ${error.message || "Unknown error"}`);
     }
 };
+
+export const generateCashFlowForecast = async (transactions, currentBalance) => {
+    if (!model) return [];
+
+    // 1. Prepare Context: Last 90 days of history
+    const today = new Date();
+    const ninetyDaysAgo = new Date(today);
+    ninetyDaysAgo.setDate(today.getDate() - 90);
+
+    const history = transactions
+        .filter(t => new Date(t.date) >= ninetyDaysAgo)
+        .map(t => ({
+            date: t.date,
+            amount: t.amount, // + for income, - for expense
+            category: t.category,
+            note: t.note
+        }));
+
+    const prompt = `
+    Current Date: ${today.toISOString().split('T')[0]}
+    Current Balance: ${currentBalance}
+    Transaction History (Last 90 Days): ${JSON.stringify(history)}
+
+    GOAL: Forecast the daily balance for the NEXT 30 DAYS.
+
+    INSTRUCTIONS:
+    1. Analyze the history to identify RECURRING bills/income (e.g., Rent, Salary, Subscriptions) based on amount and day of month.
+    2. Estimate average daily VARIABLE spending (Food, Transport, etc.).
+    3. Generate a daily forecast starting from tomorrow.
+    4. For each day, calculate the projected balance.
+
+    OUTPUT FORMAT:
+    Return a STRICT JSON array of objects:
+    [
+        { "date": "YYYY-MM-DD", "balance": number, "reason": "Salary" | "Rent" | "Estimated Spending" | null }
+    ]
+    `;
+
+    try {
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const response = await result.response;
+        const text = response.text();
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("Gemini Forecast Error:", error);
+        return [];
+    }
+};
