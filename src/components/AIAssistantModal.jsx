@@ -92,10 +92,14 @@ const AIAssistantModal = ({ onClose }) => {
             setError('');
             setInput('');
             transcriptRef.current = '';
+            isSubmittingRef.current = false;
 
             // Safety timeout: Stop if no speech detected after 8 seconds
             silenceTimerRef.current = setTimeout(() => {
-                stopListening();
+                if (!transcriptRef.current) {
+                    setError("No speech detected.");
+                    stopListening();
+                }
             }, 8000);
         };
 
@@ -111,9 +115,12 @@ const AIAssistantModal = ({ onClose }) => {
             setInput(transcript);
             transcriptRef.current = transcript;
 
-            // Set new silence timer: Stop 2 seconds after user stops speaking
+            // Set new silence timer: PROCESS IMMEDIATELY after 2 seconds of silence
             silenceTimerRef.current = setTimeout(() => {
                 stopListening();
+                if (transcriptRef.current.trim() && !isSubmittingRef.current) {
+                    handleAnalyze(null, transcriptRef.current);
+                }
             }, 2000);
         };
 
@@ -135,7 +142,8 @@ const AIAssistantModal = ({ onClose }) => {
             setIsListening(false);
             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
-            if (transcriptRef.current.trim()) {
+            // Only trigger if we haven't already submitted (e.g. via silence timer)
+            if (transcriptRef.current.trim() && !isSubmittingRef.current && !isLoading) {
                 handleAnalyze(null, transcriptRef.current);
             }
         };
@@ -149,6 +157,10 @@ const AIAssistantModal = ({ onClose }) => {
         const textToAnalyze = overrideInput || input;
 
         if (!textToAnalyze.trim()) return;
+
+        // Prevent double submission
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
 
         setIsLoading(true);
         setError('');
@@ -194,8 +206,11 @@ const AIAssistantModal = ({ onClose }) => {
         } catch (err) {
             setError(err.message || "Could not understand.");
             speak("I couldn't understand that.");
+            isSubmittingRef.current = false; // Reset on error
         } finally {
             setIsLoading(false);
+            // Note: We don't reset isSubmittingRef here if successful, 
+            // because handleConfirm will use it. It gets reset in handleConfirm or if we start listening again.
         }
     };
 
