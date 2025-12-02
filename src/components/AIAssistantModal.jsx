@@ -122,7 +122,11 @@ const AIAssistantModal = ({ onClose }) => {
             if (event.error === 'no-speech') {
                 setError("Didn't hear anything.");
             } else if (event.error === 'not-allowed') {
-                setError("Microphone access denied.");
+                setError("Microphone denied. Check permissions.");
+            } else if (event.error === 'service-not-allowed') {
+                setError("Voice service unavailable.");
+            } else {
+                setError(`Error: ${event.error}`);
             }
             stopListening();
         };
@@ -233,12 +237,10 @@ const AIAssistantModal = ({ onClose }) => {
     };
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            startListening();
-        }, 500);
+        // Removed auto-start: Mobile browsers require a user gesture to access the microphone.
+        // startListening() is now only called via the microphone button.
 
         return () => {
-            clearTimeout(timer);
             stopListening();
             if (timerRef.current) {
                 clearInterval(timerRef.current);
