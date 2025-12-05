@@ -252,8 +252,14 @@ const AIAssistantModal = ({ onClose }) => {
     };
 
     useEffect(() => {
-        // Removed auto-start: Mobile browsers require a user gesture to access the microphone.
-        // startListening() is now only called via the microphone button.
+        // Check for API Key
+        const hasKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!hasKey) {
+            setError("Gemini API Key is missing. Please configure VITE_GEMINI_API_KEY in your .env file.");
+        } else {
+            // Auto-start listening on open
+            startListening();
+        }
 
         return () => {
             stopListening();
@@ -311,7 +317,21 @@ const AIAssistantModal = ({ onClose }) => {
                 {/* Content Area */}
                 <div className="relative z-10 p-6 pt-4 min-h-[350px] flex flex-col">
 
-                    {!parsedData ? (
+                    {error && error.includes("API Key") ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4">
+                            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-2">
+                                <Activity size={32} className="text-red-400" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white">Configuration Required</h3>
+                            <p className="text-slate-400 max-w-xs mx-auto">
+                                The AI Assistant needs a Gemini API Key to function.
+                            </p>
+                            <div className="bg-slate-950 p-3 rounded-lg border border-white/10 mt-4">
+                                <code className="text-xs text-indigo-300 font-mono">VITE_GEMINI_API_KEY=...</code>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">Add this to your .env file</p>
+                        </div>
+                    ) : !parsedData ? (
                         <div className="flex-1 flex flex-col items-center justify-center space-y-8">
 
                             {/* Visualizer Container - No Background, Just Clouds */}

@@ -13,6 +13,8 @@ if (API_KEY) {
     console.error("Gemini API Key is missing! Make sure VITE_GEMINI_API_KEY is set in .env");
 }
 
+export const checkApiKey = () => !!API_KEY;
+
 export const parseTransactionWithGemini = async (text, history = []) => {
     if (!model) {
         throw new Error("Gemini API is not configured. Please check your settings.");

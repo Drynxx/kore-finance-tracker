@@ -4,8 +4,6 @@ import { User, Lock, ArrowRight, Mail } from 'lucide-react';
 
 export const AuthScreens = () => {
     const [isLogin, setIsLogin] = useState(true);
-    const { login, register } = useAuth();
-
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -13,6 +11,37 @@ export const AuthScreens = () => {
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const [showForgotModal, setShowForgotModal] = useState(false);
+    const [resetEmail, setResetEmail] = useState('');
+    const [resetStatus, setResetStatus] = useState({ loading: false, message: '', error: '' });
+    const { login, register, sendPasswordReset } = useAuth();
+
+    const handleForgotSubmit = async (e) => {
+        e.preventDefault();
+        setResetStatus({ loading: true, message: '', error: '' });
+
+        const result = await sendPasswordReset(resetEmail);
+
+        if (result.success) {
+            setResetStatus({
+                loading: false,
+                message: 'Recovery email sent! Check your inbox.',
+                error: ''
+            });
+            setTimeout(() => {
+                setShowForgotModal(false);
+                setResetStatus({ loading: false, message: '', error: '' });
+                setResetEmail('');
+            }, 3000);
+        } else {
+            setResetStatus({
+                loading: false,
+                message: '',
+                error: result.error
+            });
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -29,6 +58,15 @@ export const AuthScreens = () => {
                     setLoading(false);
                     return;
                 }
+
+                // Strict Email Validation
+                const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+                if (!emailRegex.test(formData.email)) {
+                    setError('Please enter a valid email address');
+                    setLoading(false);
+                    return;
+                }
+
                 result = await register(formData.name, formData.email, formData.password);
             }
 
@@ -128,6 +166,17 @@ export const AuthScreens = () => {
                                     placeholder="••••••••"
                                 />
                             </div>
+                            {isLogin && (
+                                <div className="flex justify-end px-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowForgotModal(true)}
+                                        className="text-xs text-white/60 hover:text-white transition-colors"
+                                    >
+                                        Forgot Password?
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         <button
@@ -159,6 +208,55 @@ export const AuthScreens = () => {
 
                 </div>
             </div>
+
+            {/* Forgot Password Modal */}
+            {showForgotModal && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[2rem] p-8 w-full max-w-sm shadow-2xl shadow-black/50 relative">
+                        <button
+                            onClick={() => setShowForgotModal(false)}
+                            className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+                        >
+                            ✕
+                        </button>
+                        <h3 className="text-xl font-bold text-white mb-2">Reset Password</h3>
+                        <p className="text-white/60 text-sm mb-6">Enter your email to receive a recovery link.</p>
+
+                        <form onSubmit={handleForgotSubmit} className="space-y-4">
+                            {resetStatus.message && (
+                                <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 text-sm text-center border border-emerald-500/30">
+                                    {resetStatus.message}
+                                </div>
+                            )}
+                            {resetStatus.error && (
+                                <div className="p-3 rounded-xl bg-rose-500/20 text-rose-300 text-sm text-center border border-rose-500/30">
+                                    {resetStatus.error}
+                                </div>
+                            )}
+
+                            <div className="relative group">
+                                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/60 group-focus-within:text-white transition-colors" />
+                                <input
+                                    type="email"
+                                    value={resetEmail}
+                                    onChange={(e) => setResetEmail(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-full py-3 pl-14 pr-6 text-white placeholder-white/40 focus:outline-none focus:bg-white/10 focus:border-white/30 transition-all"
+                                    placeholder="your@email.com"
+                                    required
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={resetStatus.loading}
+                                className="w-full bg-indigo-500 hover:bg-indigo-400 text-white font-bold py-3 rounded-full shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                            >
+                                {resetStatus.loading ? 'Sending...' : 'Send Recovery Link'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Creator Credit */}
             <div className="absolute bottom-6 left-0 right-0 text-center z-20 pointer-events-none">

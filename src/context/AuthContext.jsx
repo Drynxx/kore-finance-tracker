@@ -39,6 +39,9 @@ export const AuthProvider = ({ children }) => {
             const currentUser = await account.get();
             setUser(currentUser);
 
+            // Trigger verification email automatically
+            await sendVerificationEmail();
+
             return { success: true };
         } catch (error) {
             console.error('Registration error:', error);
@@ -73,8 +76,76 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const sendVerificationEmail = async () => {
+        try {
+            // Redirect back to the app's root url
+            await account.createVerification(`${window.location.origin}/verify`);
+            return { success: true };
+        } catch (error) {
+            console.error('Verification email error:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to send verification email'
+            };
+        }
+    };
+
+    const completeVerification = async (userId, secret) => {
+        try {
+            await account.updateVerification(userId, secret);
+            // Refresh user data to update emailVerification status
+            const currentUser = await account.get();
+            setUser(currentUser);
+            return { success: true };
+        } catch (error) {
+            console.error('Verification completion error:', error);
+            return {
+                success: false,
+                error: error.message || 'Verification failed'
+            };
+        }
+    };
+
+    const sendPasswordReset = async (email) => {
+        try {
+            // Redirect back to the app's root url with type=recovery
+            await account.createRecovery(email, `${window.location.origin}?type=recovery`);
+            return { success: true };
+        } catch (error) {
+            console.error('Password reset error:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to send password reset email'
+            };
+        }
+    };
+
+    const completePasswordReset = async (userId, secret, password, passwordAgain) => {
+        try {
+            await account.updateRecovery(userId, secret, password, passwordAgain);
+            return { success: true };
+        } catch (error) {
+            console.error('Password reset completion error:', error);
+            return {
+                success: false,
+                error: error.message || 'Password reset failed'
+            };
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+        <AuthContext.Provider value={{
+            user,
+            login,
+            register,
+            logout,
+            loading,
+            sendVerificationEmail,
+            completeVerification,
+            sendPasswordReset,
+            completePasswordReset,
+            checkSession // Exposed for manual refresh
+        }}>
             {children}
         </AuthContext.Provider>
     );
