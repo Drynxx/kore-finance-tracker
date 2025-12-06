@@ -58,16 +58,21 @@ const AIAssistantModal = ({ onClose }) => {
 
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
-    const silenceTimerRef = useRef(null);
+    const mimeTypeRef = useRef("");
 
-    const stopListening = () => {
-        if (recognitionRef.current) {
-            recognitionRef.current.stop();
+    const toggleListening = () => {
+        if (isListening) {
+            stopRecording();
+        } else {
+            startRecording();
         }
-        if (silenceTimerRef.current) {
-            clearTimeout(silenceTimerRef.current);
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
         }
-        setIsListening(false);
+        // State update handled in onstop
     };
 
     const startListening = async () => {
@@ -241,24 +246,22 @@ const AIAssistantModal = ({ onClose }) => {
     };
 
     useEffect(() => {
-        // Check for API Key
-        const hasKey = import.meta.env.VITE_GEMINI_API_KEY;
-        if (!hasKey) {
-            setError("Gemini API Key is missing. Please configure VITE_GEMINI_API_KEY in your .env file.");
-        } else {
-            // Auto-start listening on open ONLY on desktop
-            // Mobile browsers require a user gesture (tap) to start audio
-            const isMobile = window.innerWidth < 768;
-            if (!isMobile) {
-                startListening();
+        // MIME Type Detection
+        const types = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
+        for (const type of types) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                mimeTypeRef.current = type;
+                break;
             }
         }
 
+        const hasKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!hasKey) {
+            setError("Gemini API Key is missing.");
+        }
+
         return () => {
-            stopListening();
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-            }
+            stopRecording();
             window.speechSynthesis.cancel();
         };
     }, []);
@@ -330,15 +333,21 @@ const AIAssistantModal = ({ onClose }) => {
                             {/* Visualizer Container - No Background, Just Clouds */}
                             <div className="relative w-full h-48 flex items-center justify-center">
                                 {isListening ? (
-                                    <div className="absolute inset-0 scale-150 opacity-80">
+                                    <div
+                                        onClick={toggleListening}
+                                        className="absolute inset-0 scale-150 opacity-80 cursor-pointer flex flex-col items-center justify-center"
+                                    >
                                         <VoiceVisualizer isListening={isListening} />
+                                        <div className="absolute bottom-[-40px] bg-red-500/20 text-red-200 px-4 py-1 rounded-full text-xs font-semibold backdrop-blur-md border border-red-500/30 animate-pulse">
+                                            Tap to Send
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="relative z-10 flex flex-col items-center gap-4">
                                         <motion.button
                                             whileHover={{ scale: 1.05 }}
                                             whileTap={{ scale: 0.95 }}
-                                            onClick={startListening}
+                                            onClick={toggleListening}
                                             className={`w-20 h-20 rounded-full backdrop-blur-md border flex items-center justify-center group shadow-xl shadow-black/20 ${error && error.includes("support") ? "bg-red-500/10 border-red-500/30" : "bg-white/10 border-white/20"}`}
                                         >
                                             {error && error.includes("support") ? (
@@ -351,6 +360,9 @@ const AIAssistantModal = ({ onClose }) => {
                                             <span className="text-xs text-red-300 bg-red-900/20 px-3 py-1 rounded-full border border-red-500/20">
                                                 Use Chrome/Edge for Voice
                                             </span>
+                                        )}
+                                        {!error && !isListening && (
+                                            <span className="text-xs text-slate-400 font-medium">Tap to Speak</span>
                                         )}
                                     </div>
                                 )}

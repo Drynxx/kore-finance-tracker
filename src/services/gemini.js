@@ -15,7 +15,7 @@ if (API_KEY) {
 
 export const checkApiKey = () => !!API_KEY;
 
-export const parseVoiceTransaction = async (audioBase64, history = []) => {
+export const parseVoiceTransaction = async (audioBase64, mimeType = "audio/webm", history = []) => {
     if (!model) throw new Error("AI not configured");
 
     const recentHistory = history.slice(0, 50).map(t => ({
@@ -48,7 +48,7 @@ export const parseVoiceTransaction = async (audioBase64, history = []) => {
                     { text: prompt },
                     {
                         inlineData: {
-                            mimeType: "audio/mp3",
+                            mimeType: mimeType,
                             data: audioBase64
                         }
                     }
