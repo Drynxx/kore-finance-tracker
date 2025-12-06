@@ -56,7 +56,8 @@ const AIAssistantModal = ({ onClose }) => {
         window.speechSynthesis.speak(utterance);
     };
 
-    const recognitionRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
     const silenceTimerRef = useRef(null);
 
     const stopListening = () => {
@@ -69,88 +70,74 @@ const AIAssistantModal = ({ onClose }) => {
         setIsListening(false);
     };
 
-    const startListening = () => {
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            setError("Browser doesn't support voice. Please type.");
-            setIsListening(false); // Force text mode
-            return;
-        }
+    const startListening = async () => {
+        setError('');
+        setIsListening(true);
+        setInput('');
+        audioChunksRef.current = [];
 
-        // Stop any existing instance
-        if (recognitionRef.current) {
-            recognitionRef.current.abort();
-        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-
-        recognition.continuous = false; // Mobile prefers false for short commands
-        recognition.interimResults = true;
-        recognition.lang = language; // Dynamic language selection
-
-        recognition.onstart = () => {
-            setIsListening(true);
-            setError('');
-            setInput('');
-            transcriptRef.current = '';
-            isSubmittingRef.current = false;
-
-            // Safety timeout: Stop if no speech detected after 12 seconds (extended for mobile)
-            silenceTimerRef.current = setTimeout(() => {
-                if (!transcriptRef.current) {
-                    setError("No speech detected.");
-                    stopListening();
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
                 }
-            }, 12000);
-        };
+            };
 
-        recognition.onresult = (event) => {
-            // Clear silence timer on every result
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            mediaRecorder.onstop = async () => {
+                setIsListening(false);
+                setIsLoading(true);
 
-            const transcript = Array.from(event.results)
-                .map(result => result[0])
-                .map(result => result.transcript)
-                .join('');
+                // Stop tracks
+                stream.getTracks().forEach(track => track.stop());
 
-            setInput(transcript);
-            transcriptRef.current = transcript;
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const base64Audio = reader.result.split(',')[1];
+                    try {
+                        const transactionList = transactions.map(t => ({
+                            date: t.date,
+                            amount: t.amount,
+                            category: t.category,
+                            note: t.note,
+                            type: t.type
+                        }));
 
-            // Set new silence timer: PROCESS IMMEDIATELY after 2 seconds of silence
+                        // Import dynamically to avoid circular deps if any
+                        const { parseVoiceTransaction } = await import('../services/gemini');
+                        const result = await parseVoiceTransaction(base64Audio, transactionList);
+
+                        setParsedData(result);
+                        if (result.conversational_response) {
+                            speak(result.conversational_response);
+                        }
+                    } catch (err) {
+                        console.error("Audio Analysis Error:", err);
+                        setError("Could not understand audio. Please try again.");
+                        speak("I couldn't hear that clearly. Please try again.");
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+            };
+
+            mediaRecorderRef.current = mediaRecorder;
+            mediaRecorder.start();
+
+            // Auto-stop after 8 seconds of recording
             silenceTimerRef.current = setTimeout(() => {
                 stopListening();
-                if (transcriptRef.current.trim() && !isSubmittingRef.current) {
-                    handleAnalyze(null, transcriptRef.current);
-                }
-            }, 2000);
-        };
+            }, 8000);
 
-        recognition.onerror = (event) => {
-            console.error("Speech recognition error", event.error);
-            if (event.error === 'no-speech') {
-                setError("Didn't hear anything.");
-            } else if (event.error === 'not-allowed') {
-                setError("Microphone denied. Check permissions.");
-            } else if (event.error === 'service-not-allowed') {
-                setError("Voice service unavailable.");
-            } else {
-                setError(`Error: ${event.error}`);
-            }
-            stopListening();
-        };
-
-        recognition.onend = () => {
+        } catch (err) {
+            console.error("Microphone Error:", err);
+            setError("Microphone access denied or not supported.");
             setIsListening(false);
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-
-            // Only trigger if we haven't already submitted (e.g. via silence timer)
-            if (transcriptRef.current.trim() && !isSubmittingRef.current && !isLoading) {
-                handleAnalyze(null, transcriptRef.current);
-            }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
+        }
     };
 
     const handleAnalyze = async (e, overrideInput = null) => {
