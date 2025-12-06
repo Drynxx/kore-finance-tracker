@@ -95,13 +95,13 @@ const AIAssistantModal = ({ onClose }) => {
             transcriptRef.current = '';
             isSubmittingRef.current = false;
 
-            // Safety timeout: Stop if no speech detected after 8 seconds
+            // Safety timeout: Stop if no speech detected after 12 seconds (extended for mobile)
             silenceTimerRef.current = setTimeout(() => {
                 if (!transcriptRef.current) {
                     setError("No speech detected.");
                     stopListening();
                 }
-            }, 8000);
+            }, 12000);
         };
 
         recognition.onresult = (event) => {
