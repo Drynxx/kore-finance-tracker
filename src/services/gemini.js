@@ -8,7 +8,7 @@ let model = null;
 
 if (API_KEY) {
     genAI = new GoogleGenerativeAI(API_KEY);
-    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    model = genAI.getGenerativeModel({ model: "gemini-pro" });
 } else {
     console.error("Gemini API Key is missing! Make sure VITE_GEMINI_API_KEY is set in .env");
 }
