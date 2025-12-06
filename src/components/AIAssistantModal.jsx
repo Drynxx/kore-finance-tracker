@@ -204,8 +204,9 @@ const AIAssistantModal = ({ onClose }) => {
             setAutoSubmitTimer(timer);
 
         } catch (err) {
+            console.error("AI Analysis Error:", err);
             setError(err.message || "Could not understand.");
-            speak("I couldn't understand that.");
+            speak("I couldn't understand that. Please check the screen for details.");
             isSubmittingRef.current = false; // Reset on error
         } finally {
             setIsLoading(false);
@@ -257,8 +258,12 @@ const AIAssistantModal = ({ onClose }) => {
         if (!hasKey) {
             setError("Gemini API Key is missing. Please configure VITE_GEMINI_API_KEY in your .env file.");
         } else {
-            // Auto-start listening on open
-            startListening();
+            // Auto-start listening on open ONLY on desktop
+            // Mobile browsers require a user gesture (tap) to start audio
+            const isMobile = window.innerWidth < 768;
+            if (!isMobile) {
+                startListening();
+            }
         }
 
         return () => {

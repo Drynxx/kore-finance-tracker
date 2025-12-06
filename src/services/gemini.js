@@ -79,8 +79,14 @@ export const parseTransactionWithGemini = async (text, history = []) => {
 
         const response = await result.response;
         const text = response.text();
+        console.log("Raw Gemini Response:", text);
 
-        return JSON.parse(text);
+        try {
+            return JSON.parse(text);
+        } catch (parseError) {
+            console.error("JSON Parse Error:", parseError, "Response Text:", text);
+            throw new Error(`Failed to parse AI response. Raw: ${text.substring(0, 50)}...`);
+        }
     } catch (error) {
         console.error("Gemini Error:", error);
         throw new Error(`AI Error: ${error.message || "Unknown error"}`);
