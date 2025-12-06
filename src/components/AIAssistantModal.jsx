@@ -361,13 +361,13 @@ const AIAssistantModal = ({ onClose }) => {
                             <div className="text-center space-y-6 relative z-20">
                                 <AnimatePresence mode="wait">
                                     <motion.p
-                                        key={isListening ? "listening" : "idle"}
+                                        key={error ? "error" : isListening ? "listening" : "idle"}
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -10 }}
-                                        className="text-2xl font-light text-white tracking-tight"
+                                        className={`text-2xl font-light tracking-tight ${error ? "text-red-400" : "text-white"}`}
                                     >
-                                        {isListening ? "Listening..." : (input || "How can I help?")}
+                                        {error || (isListening ? "Listening..." : (input || "How can I help?"))}
                                     </motion.p>
                                 </AnimatePresence>
 
