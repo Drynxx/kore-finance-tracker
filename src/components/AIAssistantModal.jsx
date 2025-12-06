@@ -56,93 +56,101 @@ const AIAssistantModal = ({ onClose }) => {
         window.speechSynthesis.speak(utterance);
     };
 
-    const mediaRecorderRef = useRef(null);
-    const audioChunksRef = useRef([]);
-    const mimeTypeRef = useRef("");
+    const recognitionRef = useRef(null);
+    const silenceTimerRef = useRef(null);
 
-    const toggleListening = () => {
-        if (isListening) {
-            stopRecording();
-        } else {
-            startRecording();
+    const stopListening = () => {
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
         }
+        if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+        }
+        setIsListening(false);
     };
 
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            mediaRecorderRef.current.stop();
+    const startListening = () => {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            setError("Browser doesn't support voice. Please type.");
+            setIsListening(false); // Force text mode
+            return;
         }
-        // State update handled in onstop
-    };
 
-    const startListening = async () => {
-        setError('');
-        setIsListening(true);
-        setInput('');
-        audioChunksRef.current = [];
+        // Stop any existing instance
+        if (recognitionRef.current) {
+            recognitionRef.current.abort();
+        }
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunksRef.current.push(event.data);
+        recognition.continuous = false; // Mobile prefers false for short commands
+        recognition.interimResults = true;
+        recognition.lang = language; // Dynamic language selection
+
+        recognition.onstart = () => {
+            setIsListening(true);
+            setError('');
+            setInput('');
+            transcriptRef.current = '';
+            isSubmittingRef.current = false;
+
+            // Safety timeout: Stop if no speech detected after 8 seconds
+            silenceTimerRef.current = setTimeout(() => {
+                if (!transcriptRef.current) {
+                    setError("No speech detected.");
+                    stopListening();
                 }
-            };
+            }, 8000);
+        };
 
-            mediaRecorder.onstop = async () => {
-                setIsListening(false);
-                setIsLoading(true);
+        recognition.onresult = (event) => {
+            // Clear silence timer on every result
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
-                // Stop tracks
-                stream.getTracks().forEach(track => track.stop());
+            const transcript = Array.from(event.results)
+                .map(result => result[0])
+                .map(result => result.transcript)
+                .join('');
 
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
-                const reader = new FileReader();
-                reader.readAsDataURL(audioBlob);
-                reader.onloadend = async () => {
-                    const base64Audio = reader.result.split(',')[1];
-                    try {
-                        const transactionList = transactions.map(t => ({
-                            date: t.date,
-                            amount: t.amount,
-                            category: t.category,
-                            note: t.note,
-                            type: t.type
-                        }));
+            setInput(transcript);
+            transcriptRef.current = transcript;
 
-                        // Import dynamically to avoid circular deps if any
-                        const { parseVoiceTransaction } = await import('../services/gemini');
-                        const result = await parseVoiceTransaction(base64Audio, transactionList);
-
-                        setParsedData(result);
-                        if (result.conversational_response) {
-                            speak(result.conversational_response);
-                        }
-                    } catch (err) {
-                        console.error("Audio Analysis Error:", err);
-                        setError("Could not understand audio. Please try again.");
-                        speak("I couldn't hear that clearly. Please try again.");
-                    } finally {
-                        setIsLoading(false);
-                    }
-                };
-            };
-
-            mediaRecorderRef.current = mediaRecorder;
-            mediaRecorder.start();
-
-            // Auto-stop after 8 seconds of recording
+            // Set new silence timer: PROCESS IMMEDIATELY after 2 seconds of silence
             silenceTimerRef.current = setTimeout(() => {
                 stopListening();
-            }, 8000);
+                if (transcriptRef.current.trim() && !isSubmittingRef.current) {
+                    handleAnalyze(null, transcriptRef.current);
+                }
+            }, 2000);
+        };
 
-        } catch (err) {
-            console.error("Microphone Error:", err);
-            setError("Microphone access denied or not supported.");
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error", event.error);
+            if (event.error === 'no-speech') {
+                setError("Didn't hear anything.");
+            } else if (event.error === 'not-allowed') {
+                setError("Microphone denied. Check permissions.");
+            } else if (event.error === 'service-not-allowed') {
+                setError("Voice service unavailable.");
+            } else {
+                setError(`Error: ${event.error}`);
+            }
+            stopListening();
+        };
+
+        recognition.onend = () => {
             setIsListening(false);
-        }
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+            // Only trigger if we haven't already submitted (e.g. via silence timer)
+            if (transcriptRef.current.trim() && !isSubmittingRef.current && !isLoading) {
+                handleAnalyze(null, transcriptRef.current);
+            }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
     };
 
     const handleAnalyze = async (e, overrideInput = null) => {
@@ -246,22 +254,24 @@ const AIAssistantModal = ({ onClose }) => {
     };
 
     useEffect(() => {
-        // MIME Type Detection
-        const types = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
-        for (const type of types) {
-            if (MediaRecorder.isTypeSupported(type)) {
-                mimeTypeRef.current = type;
-                break;
+        // Check for API Key
+        const hasKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!hasKey) {
+            setError("Gemini API Key is missing. Please configure VITE_GEMINI_API_KEY in your .env file.");
+        } else {
+            // Auto-start listening on open ONLY on desktop
+            // Mobile browsers require a user gesture (tap) to start audio
+            const isMobile = window.innerWidth < 768;
+            if (!isMobile) {
+                startListening();
             }
         }
 
-        const hasKey = import.meta.env.VITE_GEMINI_API_KEY;
-        if (!hasKey) {
-            setError("Gemini API Key is missing.");
-        }
-
         return () => {
-            stopRecording();
+            stopListening();
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
             window.speechSynthesis.cancel();
         };
     }, []);
@@ -333,21 +343,15 @@ const AIAssistantModal = ({ onClose }) => {
                             {/* Visualizer Container - No Background, Just Clouds */}
                             <div className="relative w-full h-48 flex items-center justify-center">
                                 {isListening ? (
-                                    <div
-                                        onClick={toggleListening}
-                                        className="absolute inset-0 scale-150 opacity-80 cursor-pointer flex flex-col items-center justify-center"
-                                    >
+                                    <div className="absolute inset-0 scale-150 opacity-80">
                                         <VoiceVisualizer isListening={isListening} />
-                                        <div className="absolute bottom-[-40px] bg-red-500/20 text-red-200 px-4 py-1 rounded-full text-xs font-semibold backdrop-blur-md border border-red-500/30 animate-pulse">
-                                            Tap to Send
-                                        </div>
                                     </div>
                                 ) : (
                                     <div className="relative z-10 flex flex-col items-center gap-4">
                                         <motion.button
                                             whileHover={{ scale: 1.05 }}
                                             whileTap={{ scale: 0.95 }}
-                                            onClick={toggleListening}
+                                            onClick={startListening}
                                             className={`w-20 h-20 rounded-full backdrop-blur-md border flex items-center justify-center group shadow-xl shadow-black/20 ${error && error.includes("support") ? "bg-red-500/10 border-red-500/30" : "bg-white/10 border-white/20"}`}
                                         >
                                             {error && error.includes("support") ? (
@@ -360,9 +364,6 @@ const AIAssistantModal = ({ onClose }) => {
                                             <span className="text-xs text-red-300 bg-red-900/20 px-3 py-1 rounded-full border border-red-500/20">
                                                 Use Chrome/Edge for Voice
                                             </span>
-                                        )}
-                                        {!error && !isListening && (
-                                            <span className="text-xs text-slate-400 font-medium">Tap to Speak</span>
                                         )}
                                     </div>
                                 )}

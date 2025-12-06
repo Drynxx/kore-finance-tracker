@@ -15,57 +15,6 @@ if (API_KEY) {
 
 export const checkApiKey = () => !!API_KEY;
 
-export const parseVoiceTransaction = async (audioBase64, mimeType = "audio/webm", history = []) => {
-    if (!model) throw new Error("AI not configured");
-
-    const recentHistory = history.slice(0, 50).map(t => ({
-        date: t.date,
-        amount: t.amount,
-        category: t.category,
-        note: t.note,
-        type: t.type
-    }));
-
-    const prompt = `
-    You are a financial assistant. Listen to the audio and extract the INTENT.
-    Current Date: ${new Date().toISOString().split('T')[0]}
-    Transaction History: ${JSON.stringify(recentHistory)}
-
-    INTENTS:
-    1. ADD_TRANSACTION (e.g. "Spent 50 on pizza")
-       Output JSON: { "intent": "add", "amount": number, "category": "Food"|"Transport"|..., "note": string, "date": "YYYY-MM-DD", "type": "expense"|"income", "conversational_response": string }
-    2. QUERY (e.g. "How much did I spend?")
-       Output JSON: { "intent": "query", "conversational_response": string }
-
-    Return STRICT JSON.
-    `;
-
-    try {
-        const result = await model.generateContent({
-            contents: [{
-                role: "user",
-                parts: [
-                    { text: prompt },
-                    {
-                        inlineData: {
-                            mimeType: mimeType,
-                            data: audioBase64
-                        }
-                    }
-                ]
-            }],
-            generationConfig: { responseMimeType: "application/json" }
-        });
-
-        const text = await result.response.text();
-        console.log("Gemini Audio Response:", text);
-        return JSON.parse(text);
-    } catch (error) {
-        console.error("Gemini Audio Error:", error);
-        throw new Error("Failed to process audio.");
-    }
-};
-
 export const parseTransactionWithGemini = async (text, history = []) => {
     if (!model) {
         throw new Error("Gemini API is not configured. Please check your settings.");
