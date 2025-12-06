@@ -71,7 +71,8 @@ const AIAssistantModal = ({ onClose }) => {
 
     const startListening = () => {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            setError("Voice input is not supported.");
+            setError("Browser doesn't support voice. Please type.");
+            setIsListening(false); // Force text mode
             return;
         }
 
@@ -346,14 +347,25 @@ const AIAssistantModal = ({ onClose }) => {
                                         <VoiceVisualizer isListening={isListening} />
                                     </div>
                                 ) : (
-                                    <motion.button
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={startListening}
-                                        className="relative z-10 w-20 h-20 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center group shadow-xl shadow-black/20"
-                                    >
-                                        <Mic size={32} className="text-white opacity-80 group-hover:opacity-100 transition-opacity" />
-                                    </motion.button>
+                                    <div className="relative z-10 flex flex-col items-center gap-4">
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={startListening}
+                                            className={`w-20 h-20 rounded-full backdrop-blur-md border flex items-center justify-center group shadow-xl shadow-black/20 ${error && error.includes("support") ? "bg-red-500/10 border-red-500/30" : "bg-white/10 border-white/20"}`}
+                                        >
+                                            {error && error.includes("support") ? (
+                                                <Keyboard size={32} className="text-red-400 opacity-80" />
+                                            ) : (
+                                                <Mic size={32} className="text-white opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            )}
+                                        </motion.button>
+                                        {error && error.includes("support") && (
+                                            <span className="text-xs text-red-300 bg-red-900/20 px-3 py-1 rounded-full border border-red-500/20">
+                                                Use Chrome/Edge for Voice
+                                            </span>
+                                        )}
+                                    </div>
                                 )}
                             </div>
 
