@@ -82,7 +82,13 @@ export const parseTransactionWithGemini = async (text, history = []) => {
         console.log("Raw Gemini Response:", text);
 
         try {
-            return JSON.parse(text);
+            // Helper to clean markdown json code blocks
+            const cleanJson = (str) => {
+                return str.replace(/```json\n?|\n?```/g, '').trim();
+            };
+
+            const cleanedText = cleanJson(text);
+            return JSON.parse(cleanedText);
         } catch (parseError) {
             console.error("JSON Parse Error:", parseError, "Response Text:", text);
             throw new Error(`Failed to parse AI response. Raw: ${text.substring(0, 50)}...`);
@@ -138,7 +144,12 @@ export const generateCashFlowForecast = async (transactions, currentBalance) => 
 
         const response = await result.response;
         const text = response.text();
-        return JSON.parse(text);
+
+        const cleanJson = (str) => {
+            return str.replace(/```json\n?|\n?```/g, '').trim();
+        };
+
+        return JSON.parse(cleanJson(text));
     } catch (error) {
         console.error("Gemini Forecast Error:", error);
         return [];

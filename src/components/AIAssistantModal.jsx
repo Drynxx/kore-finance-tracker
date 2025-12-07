@@ -212,7 +212,16 @@ const AIAssistantModal = ({ onClose }) => {
         } finally {
             setIsLoading(false);
             // Note: We don't reset isSubmittingRef here if successful, 
-            // because handleConfirm will use it. It gets reset in handleConfirm or if we start listening again.
+            // because handleConfirm will use it.
+
+            // CONTINUOUS MODE: Attempt to restart listening if we're done and no error that blocks us
+            // use a small timeout to let the UI settle
+            setTimeout(() => {
+                if (transcriptRef.current && !isSubmittingRef.current) {
+                    // If we are NOT submitting (meaning it was a query or just a failed attempt), start listening again
+                    startListening();
+                }
+            }, 500);
         }
     };
 
@@ -237,7 +246,14 @@ const AIAssistantModal = ({ onClose }) => {
             };
 
             await addTransaction(newTransaction);
-            onClose();
+            // onClose(); // Don't close, keep listening for next command
+
+            // Reset state for next command
+            setParsedData(null);
+            setInput('');
+            isSubmittingRef.current = false;
+            speak("Transaction saved. Ready for next command.");
+            startListening();
         } catch (err) {
             isSubmittingRef.current = false;
             setError("Failed to save transaction.");
@@ -259,12 +275,10 @@ const AIAssistantModal = ({ onClose }) => {
         if (!hasKey) {
             setError("Gemini API Key is missing. Please configure VITE_GEMINI_API_KEY in your .env file.");
         } else {
-            // Auto-start listening on open ONLY on desktop
-            // Mobile browsers require a user gesture (tap) to start audio
-            const isMobile = window.innerWidth < 768;
-            if (!isMobile) {
-                startListening();
-            }
+            // Auto-start listening on open for ALL devices
+            // Note: Mobile browsers might still block the very first attempt without a tap,
+            // but we attempt it anyway for the "continuous" feel.
+            startListening();
         }
 
         return () => {
