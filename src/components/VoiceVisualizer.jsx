@@ -1,69 +1,100 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 
-const VoiceVisualizer = ({ isListening = false }) => {
-    // Helper for random floating animation
-    // We use random values for x, y, and scale to create a "cloud" effect
-    const floatTransition = (duration) => ({
-        duration: isListening ? duration * 0.4 : duration, // Speed up significantly when listening
-        repeat: Infinity,
-        repeatType: "reverse",
-        ease: "easeInOut"
-    });
+const VoiceVisualizer = ({ isListening = false, mode = 'overlay' }) => {
 
-    return (
-        <div className="relative w-full h-full flex items-center justify-center overflow-visible">
-            {/* 
-                Container is overflow-visible to let clouds drift slightly out of bounds 
-                if the parent allows it, creating a more expansive feel.
-            */}
+    // MacOS / Apple Intelligence Style:
+    // A fluid, multi-colored gradient border/glow that morphs organically.
 
-            {/* Blob 1: Cyan Cloud - Moves widely */}
-            <motion.div
-                animate={{
-                    x: ["-30%", "20%", "-10%", "30%"],
-                    y: ["-20%", "30%", "-30%", "10%"],
-                    scale: [1, 1.4, 0.9, 1.2],
-                    opacity: [0.3, 0.6, 0.3, 0.5]
-                }}
-                transition={floatTransition(10)}
-                className="absolute w-[180px] h-[180px] rounded-full bg-gradient-to-r from-cyan-400 to-blue-400 blur-[50px] mix-blend-screen opacity-40"
-            />
-
-            {/* Blob 2: Violet Cloud - Moves widely */}
-            <motion.div
-                animate={{
-                    x: ["30%", "-20%", "20%", "-30%"],
-                    y: ["20%", "-30%", "10%", "-20%"],
-                    scale: [1.2, 0.9, 1.3, 1],
-                    opacity: [0.3, 0.5, 0.2, 0.6]
-                }}
-                transition={floatTransition(12)}
-                className="absolute w-[160px] h-[160px] rounded-full bg-gradient-to-l from-purple-500 to-indigo-500 blur-[50px] mix-blend-screen opacity-40"
-            />
-
-            {/* Blob 3: Blue/White Core - Stays more central but pulses */}
-            <motion.div
-                animate={{
-                    scale: [0.8, 1.2, 0.9, 1.1],
-                    opacity: [0.4, 0.7, 0.4, 0.6]
-                }}
-                transition={floatTransition(8)}
-                className="absolute w-[140px] h-[140px] rounded-full bg-blue-500 blur-[60px] mix-blend-screen opacity-30"
-            />
-
-            {/* Listening Pulse Overlay - A subtle white flash */}
-            {isListening && (
+    if (mode === 'overlay') {
+        // Subtle header version
+        return (
+            <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
                     animate={{
-                        opacity: [0, 0.2, 0],
-                        scale: [0.8, 1.2, 0.8]
+                        background: [
+                            "linear-gradient(90deg, #4f46e5, #0ea5e9)",
+                            "linear-gradient(90deg, #db2777, #7c3aed)",
+                            "linear-gradient(90deg, #4f46e5, #0ea5e9)"
+                        ]
                     }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute w-[200px] h-[200px] bg-white blur-[80px] mix-blend-overlay rounded-full"
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    className="absolute bottom-0 w-full h-[2px] opacity-70"
                 />
-            )}
+                {isListening && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="absolute w-full h-full bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-cyan-500/20 blur-xl"
+                    />
+                )}
+            </div>
+        );
+    }
+
+    // Full Premium Mode (Siri / Apple Intelligence Style)
+    // We use a blob morphing effect with deep, rich colors.
+    return (
+        <div className="relative w-full h-full flex items-center justify-center">
+
+            {/* The Glowing Aura */}
+            <div className="relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center">
+
+                {/* 1. Deep Core Glow */}
+                <motion.div
+                    animate={{
+                        scale: isListening ? [0.9, 1.1, 0.95, 1.05, 0.9] : 0.9,
+                        opacity: isListening ? 0.8 : 0.4
+                    }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute inset-0 rounded-full bg-indigo-600 blur-[80px] mix-blend-screen"
+                />
+
+                {/* 2. Fluid Morphing Blobs (The "Apple Intelligence" look) */}
+                {/* Cyan Blob */}
+                <motion.div
+                    animate={{
+                        x: isListening ? [0, 30, -20, 0] : 0,
+                        y: isListening ? [0, -40, 20, 0] : 0,
+                        scale: isListening ? [1, 1.2, 0.9, 1] : 1,
+                    }}
+                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute w-48 h-48 bg-cyan-500 rounded-full blur-[60px] mix-blend-screen opacity-70 top-0 left-0"
+                />
+
+                {/* Magenta/Pink Blob */}
+                <motion.div
+                    animate={{
+                        x: isListening ? [0, -30, 40, 0] : 0,
+                        y: isListening ? [0, 20, -30, 0] : 0,
+                        scale: isListening ? [1, 1.3, 0.8, 1] : 1,
+                    }}
+                    transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                    className="absolute w-48 h-48 bg-fuchsia-500 rounded-full blur-[60px] mix-blend-screen opacity-70 bottom-0 right-0"
+                />
+
+                {/* Violet Blob */}
+                <motion.div
+                    animate={{
+                        scale: isListening ? [1, 1.4, 0.8, 1] : 1,
+                    }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                    className="absolute w-40 h-40 bg-violet-600 rounded-full blur-[50px] mix-blend-screen opacity-80"
+                />
+
+                {/* 3. White Core Pulse (Voice Activity) */}
+                {isListening && (
+                    <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: [0.8, 1.1, 0.8], opacity: [0.2, 0.6, 0.2] }}
+                        transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute w-32 h-32 bg-white rounded-full blur-[50px] mix-blend-overlay z-10"
+                    />
+                )}
+            </div>
+
+            {/* Glass Container (Optional, adds to the premium feel) */}
+            {/* <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px] rounded-full z-20 pointer-events-none" /> */}
         </div>
     );
 };

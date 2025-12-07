@@ -14,7 +14,7 @@ const AIAssistantModal = ({ onClose }) => {
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: "100%", opacity: 0 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="relative w-full md:w-[480px] h-[85vh] md:h-[650px] bg-slate-900 rounded-t-[2rem] md:rounded-[2rem] flex flex-col overflow-hidden shadow-2xl border border-white/10"
+                className="relative w-full md:w-[500px] h-[85vh] md:h-[800px] max-h-[90vh] overflow-hidden rounded-t-[2rem] md:rounded-[2rem] shadow-2xl ring-1 ring-white/10"
             >
                 <KoreAIContainer onClose={onClose} />
             </motion.div>
