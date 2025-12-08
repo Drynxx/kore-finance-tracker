@@ -1,5 +1,5 @@
 
-const API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+const API_KEY = '1edc7b9b966af4f89e090f4b67177755d34474154e593d89141b8b8115294d74';
 const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel (Standard Voice)
 
 export const speakWithElevenLabs = async (text) => {
@@ -28,13 +28,13 @@ export const speakWithElevenLabs = async (text) => {
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
-        audio.play();
+        await audio.play();
 
         return audio; // Return audio instance in case we need to stop it later
 
     } catch (error) {
         console.error("ElevenLabs TTS Failed:", error);
-        // alert(`ElevenLabs Error: ${error.message}`); // Removed for production
+        // alert(`ElevenLabs Error: ${error.message}`); // Disabled for production
         // Fallback to browser TTS if ElevenLabs fails
         if ('speechSynthesis' in window) {
             const utterance = new SpeechSynthesisUtterance(text);

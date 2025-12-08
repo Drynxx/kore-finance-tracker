@@ -5,6 +5,7 @@ import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { VoiceVisualizer } from '../VoiceVisualizer';
 import { Send, Mic, X, MoreHorizontal, ArrowUp, CreditCard, Sparkles, StopCircle, Bot, Keyboard, CheckCircle2, Zap, Brain } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { speakWithElevenLabs } from '../../services/elevenlabs';
 
 // --- Sub-components ---
 
@@ -189,15 +190,8 @@ export const KoreAIContainer = ({ onClose }) => {
         }
     };
 
-    const speak = (text) => {
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            const voices = window.speechSynthesis.getVoices();
-            const voice = voices.find(v => v.lang.includes(language === 'ro-RO' ? 'ro' : 'en')) || voices[0];
-            if (voice) utterance.voice = voice;
-            window.speechSynthesis.speak(utterance);
-        }
+    const speak = async (text) => {
+        await speakWithElevenLabs(text);
     };
 
     return (

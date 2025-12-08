@@ -64,6 +64,16 @@ export const parseTransactionWithGemini = async (text, history = []) => {
     }
 
     ---
+    INTENT 3: FORECAST
+    Trigger: User asks about future spending or prediction (e.g., "How much will I spend next month?", "Cat crezi ca o sa cheltui luna viitoare?", "spending forecast").
+    Action: Analyze the "Transaction History" (recurrence, average spending) to Estimate the total for the requested period.
+    Output JSON:
+    {
+        "intent": "forecast",
+        "conversational_response": "Based on your spending habits, I predict you will spend around 2500 lei next month. / Bazat pe istoricul tău, preconizez că vei cheltui aproximativ 2500 lei luna viitoare."
+    }
+
+    ---
     Rules:
     1. Detect the language of the "User Input".
     2. Respond in the SAME language as the input.

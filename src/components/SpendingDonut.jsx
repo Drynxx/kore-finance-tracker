@@ -1,5 +1,5 @@
-import React, { useContext, useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import React, { useContext, useMemo, useState } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector } from 'recharts';
 import { TransactionContext } from '../context/TransactionContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { motion } from 'framer-motion';
@@ -9,6 +9,11 @@ const COLORS = ['#ef4444', '#f97316', '#8b5cf6', '#3b82f6', '#10b981'];
 export const SpendingDonut = () => {
     const { transactions } = useContext(TransactionContext);
     const { formatAmount } = useCurrency();
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    const onPieEnter = (_, index) => {
+        setActiveIndex(index);
+    };
 
     const data = useMemo(() => {
         const categories = {};
@@ -61,6 +66,26 @@ export const SpendingDonut = () => {
                             paddingAngle={6}
                             dataKey="value"
                             stroke="none"
+                            onMouseEnter={onPieEnter}
+                            onClick={onPieEnter}
+                            activeIndex={activeIndex}
+                            activeShape={(props) => {
+                                const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+                                return (
+                                    <g>
+                                        <Sector
+                                            cx={cx}
+                                            cy={cy}
+                                            innerRadius={innerRadius}
+                                            outerRadius={outerRadius + 4} // Slight grow effect
+                                            startAngle={startAngle}
+                                            endAngle={endAngle}
+                                            fill={fill}
+                                            style={{ filter: `drop-shadow(0 0 8px ${fill})` }}
+                                        />
+                                    </g>
+                                );
+                            }}
                         >
                             {data.map((entry, index) => (
                                 <Cell
@@ -88,8 +113,13 @@ export const SpendingDonut = () => {
                 {/* Center Text */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="text-center">
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Top</p>
-                        <p className="text-white font-bold text-sm truncate max-w-[80px] drop-shadow-md">{data[0]?.name}</p>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">
+                            {data[activeIndex]?.name || 'Total'}
+                        </p>
+                        <p className="text-white font-bold text-sm truncate max-w-[80px] drop-shadow-md">
+                            {data[activeIndex] ? formatAmount(data[activeIndex].value).replace('RON', '').trim() : ''}
+                            <span className="text-[10px] ml-0.5 text-slate-400">lei</span>
+                        </p>
                     </div>
                 </div>
             </div>
