@@ -1,7 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { TransactionContext } from '../context/TransactionContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { X, Check, Calendar, Tag, FileText, ArrowUpCircle, ArrowDownCircle, Loader2 } from 'lucide-react';
+import { suggestCategory } from '../services/gemini';
+import { X, Check, Calendar, Tag, FileText, ArrowUpCircle, ArrowDownCircle, Loader2, Plus, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CATEGORIES = ['Food', 'Rent', 'Salary', 'Freelance', 'Transport', 'Entertainment', 'Shopping', 'Utilities', 'Other'];
@@ -11,11 +12,30 @@ const AddTransactionModal = ({ onClose }) => {
     const { currency } = useCurrency();
     const [type, setType] = useState('expense');
     const [amount, setAmount] = useState('');
-    const [category, setCategory] = useState('Food');
+    const [category, setCategory] = useState(''); // Empty initially to prompt search/select
+    const [isCategoryOpen, setIsCategoryOpen] = useState(false);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [note, setNote] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(false);
+
+    const [isAiThinking, setIsAiThinking] = useState(false);
+
+    // AI Auto-Match Logic (Debounced Gemini)
+    useEffect(() => {
+        if (!note.trim()) return;
+
+        const timer = setTimeout(async () => {
+            setIsAiThinking(true);
+            const suggested = await suggestCategory(note, CATEGORIES);
+            if (suggested) {
+                setCategory(suggested);
+            }
+            setIsAiThinking(false);
+        }, 800); // Wait 800ms after typing stops
+
+        return () => clearTimeout(timer);
+    }, [note]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -137,23 +157,61 @@ const AddTransactionModal = ({ onClose }) => {
 
                     {/* Details Grid - Soft Glass Cards */}
                     <div className="space-y-4">
-                        {/* Category */}
-                        <div className="bg-white/5 rounded-2xl p-1 border border-white/5">
+                        {/* Category - Smart Combobox */}
+                        <div className="bg-white/5 rounded-2xl p-1 border border-white/5 z-20 relative">
                             <div className="relative flex items-center px-4 py-3">
                                 <div className="p-2 rounded-lg bg-white/5 mr-4 text-slate-400">
                                     <Tag size={20} />
                                 </div>
-                                <div className="flex-1">
-                                    <label className="block text-xs font-medium text-slate-500 mb-0.5">Category</label>
-                                    <select
-                                        value={category}
-                                        onChange={(e) => setCategory(e.target.value)}
-                                        className="w-full bg-transparent text-white font-medium focus:outline-none appearance-none text-base"
-                                    >
-                                        {CATEGORIES.map(cat => (
-                                            <option key={cat} value={cat} className="bg-slate-900 text-white">{cat}</option>
-                                        ))}
-                                    </select>
+                                <div className="flex-1 relative">
+                                    <div className="flex justify-between items-center mb-0.5">
+                                        <label className="block text-xs font-medium text-slate-500">Category</label>
+                                        {isAiThinking && (
+                                            <div className="flex items-center gap-1 text-[10px] text-indigo-400 font-medium">
+                                                <Sparkles size={10} className="animate-spin-slow" />
+                                                AI Matching...
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={category}
+                                            onChange={(e) => setCategory(e.target.value)}
+                                            onFocus={() => setIsCategoryOpen(true)}
+                                            onBlur={() => setTimeout(() => setIsCategoryOpen(false), 200)}
+                                            placeholder="Search or create..."
+                                            className="w-full bg-transparent text-white font-medium focus:outline-none placeholder:text-slate-600 text-base"
+                                        />
+
+                                        {/* Dropdown Options */}
+                                        {isCategoryOpen && (
+                                            <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-white/10 rounded-xl shadow-xl overflow-hidden max-h-48 overflow-y-auto z-50">
+                                                {CATEGORIES.filter(c => c.toLowerCase().includes(category.toLowerCase())).map(cat => (
+                                                    <button
+                                                        key={cat}
+                                                        onClick={() => setCategory(cat)}
+                                                        className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors flex items-center justify-between"
+                                                    >
+                                                        {cat}
+                                                        {category === cat && <Check size={14} className="text-emerald-400" />}
+                                                    </button>
+                                                ))}
+
+                                                {/* Create New Option */}
+                                                {category && !CATEGORIES.includes(category) && (
+                                                    <button
+                                                        onClick={() => setCategory(category)} // Just confirms the custom text
+                                                        className="w-full text-left px-4 py-2 text-sm text-blue-400 hover:bg-blue-500/10 transition-colors flex items-center gap-2 border-t border-white/5"
+                                                    >
+                                                        <Plus size={14} />
+                                                        Create "{category}"
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -165,3 +165,38 @@ export const generateCashFlowForecast = async (transactions, currentBalance) => 
         return [];
     }
 };
+
+export const suggestCategory = async (note, existingCategories) => {
+    if (!model || !note.trim()) return null;
+
+    const prompt = `
+    You are a categorization assistant. 
+    Analyze the transaction note: "${note}".
+    Map it to one of these existing categories: ${JSON.stringify(existingCategories)}.
+    
+    Rules:
+    1. If it clearly fits an existing category, return that category.
+    2. If it does not fit, suggest a NEW, short, generic category name (One word, Capitalized, English).
+    3. Be smart about cultural context (e.g., "Mega Image" is Food/Groceries).
+
+    Output STRICT JSON:
+    { "category": "CategoryName" }
+    `;
+
+    try {
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const response = await result.response;
+        const text = response.text();
+        const cleanJson = (str) => str.replace(/```json\n?|\n?```/g, '').trim();
+        const data = JSON.parse(cleanJson(text));
+
+        return data.category;
+    } catch (error) {
+        console.error("Gemini Categorization Error:", error);
+        return null;
+    }
+};

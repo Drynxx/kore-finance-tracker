@@ -15,7 +15,8 @@ const CURRENCIES = {
     AUD: { symbol: 'A$', name: 'Australian Dollar', code: 'AUD', flag: '🇦🇺' },
     CHF: { symbol: 'CHF', name: 'Swiss Franc', code: 'CHF', flag: '🇨🇭' },
     CNY: { symbol: '¥', name: 'Chinese Yuan', code: 'CNY', flag: '🇨🇳' },
-    RON: { symbol: 'RON', name: 'Romanian Leu', code: 'RON', flag: '🇷🇴' }
+    RON: { symbol: 'RON', name: 'Romanian Leu', code: 'RON', flag: '🇷🇴' },
+    HUF: { symbol: 'Ft', name: 'Hungarian Forint', code: 'HUF', flag: '🇭🇺' }
 };
 
 export const CurrencyProvider = ({ children }) => {
