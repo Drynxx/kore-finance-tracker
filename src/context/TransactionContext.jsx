@@ -102,12 +102,40 @@ export const TransactionProvider = ({ children }) => {
         }
     };
 
+    const updateTransaction = async (id, updatedData) => {
+        try {
+            const docData = {
+                type: updatedData.type,
+                amount: updatedData.amount,
+                category: updatedData.category,
+                date: updatedData.date,
+                note: updatedData.note || ''
+            };
+
+            const response = await databases.updateDocument(
+                DATABASE_ID,
+                COLLECTION_ID,
+                id,
+                docData
+            );
+
+            // Update local state
+            setTransactions(prev => prev.map(t =>
+                t.id === id ? { ...t, ...docData } : t
+            ));
+        } catch (error) {
+            console.error('Error updating transaction:', error);
+            throw error;
+        }
+    };
+
     return (
         <TransactionContext.Provider
             value={{
                 transactions,
                 addTransaction,
                 deleteTransaction,
+                updateTransaction,
                 loading
             }}
         >

@@ -2,7 +2,9 @@ import React, { useContext, useState } from 'react';
 import { TransactionContext } from '../context/TransactionContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { getRelativeDateLabel } from '../utils/date';
-import { Coffee, Home, Briefcase, Car, Smartphone, ShoppingCart, Utensils, Zap, Film, MoreHorizontal, Filter, Trash2 } from 'lucide-react';
+import { AddTransactionModal } from './AddTransactionModal';
+import { AnimatePresence } from 'framer-motion';
+import { Coffee, Home, Briefcase, Car, Smartphone, ShoppingCart, Utensils, Zap, Film, MoreHorizontal, Filter, Trash2, Pencil } from 'lucide-react';
 
 const CATEGORY_ICONS = {
     Food: Utensils,
@@ -20,6 +22,7 @@ const TransactionList = () => {
     const { transactions, deleteTransaction } = useContext(TransactionContext);
     const { formatAmount } = useCurrency();
     const [filter, setFilter] = useState('all');
+    const [editingTransaction, setEditingTransaction] = useState(null);
 
     const filteredTransactions = transactions.filter(t => {
         if (filter === 'month') {
@@ -87,7 +90,8 @@ const TransactionList = () => {
                                     return (
                                         <div
                                             key={transaction.id}
-                                            className="group relative overflow-hidden rounded-2xl bg-slate-900/40 hover:bg-slate-800/60 backdrop-blur-md border border-white/10 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.98]"
+                                            onClick={() => setEditingTransaction(transaction)}
+                                            className="group relative overflow-hidden rounded-2xl bg-slate-900/40 hover:bg-slate-800/60 backdrop-blur-md border border-white/10 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] cursor-pointer"
                                             style={{ animationDelay: `${index * 50}ms` }}
                                         >
                                             {/* Glass Reflection Gradient */}
@@ -128,9 +132,20 @@ const TransactionList = () => {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+                                                                setEditingTransaction(transaction);
+                                                            }}
+                                                            className="p-2.5 rounded-xl bg-white/5 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 transition-all opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0"
+                                                            title="Edit Transaction"
+                                                        >
+                                                            <Pencil size={18} />
+                                                        </button>
+
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
                                                                 deleteTransaction(transaction.id);
                                                             }}
-                                                            className="p-2.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-all opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0"
+                                                            className="p-2.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-all opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 delay-75"
                                                             title="Delete Transaction"
                                                         >
                                                             <Trash2 size={18} />
@@ -161,6 +176,15 @@ const TransactionList = () => {
                     <p className="font-sans font-light text-xl text-slate-400">No records found.</p>
                 </div>
             )}
+
+            <AnimatePresence>
+                {editingTransaction && (
+                    <AddTransactionModal
+                        transactionToEdit={editingTransaction}
+                        onClose={() => setEditingTransaction(null)}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 };
