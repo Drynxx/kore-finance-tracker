@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { rateLimiter } from '../utils/rateLimiter';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 console.log("Gemini Service Loaded. Key present:", !!API_KEY);
@@ -166,7 +167,15 @@ export const generateCashFlowForecast = async (transactions, currentBalance) => 
     }
 };
 
+
+
 export const suggestCategory = async (note, existingCategories) => {
+    // Rate Limit: 5 requests per 10 seconds
+    if (!rateLimiter.check('gemini_suggest', 5, 10000)) {
+        console.warn("Rate limit exceeded for Gemini Category Suggestion");
+        return null;
+    }
+
     if (!model || !note.trim()) return null;
 
     const prompt = `

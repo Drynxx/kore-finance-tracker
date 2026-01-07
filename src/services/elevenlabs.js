@@ -1,9 +1,16 @@
+import { rateLimiter } from '../utils/rateLimiter';
 
-const API_KEY = '1edc7b9b966af4f89e090f4b67177755d34474154e593d89141b8b8115294d74';
-const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel (Standard Voice)
+const API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+const VOICE_ID = import.meta.env.VITE_ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'; // Rachel (Standard Voice)
+
+
 
 export const speakWithElevenLabs = async (text) => {
     try {
+        // Rate Limit: 3 requests per 60 seconds (Standard Tier is expensive)
+        if (!rateLimiter.check('elevenlabs_tts', 3, 60000)) {
+            throw new Error("Rate limit exceeded. Falling back to browser TTS.");
+        }
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
             method: 'POST',
             headers: {
