@@ -25,12 +25,19 @@ export const TransactionProvider = ({ children }) => {
             setLoading(true);
             let allDocuments = [];
             let lastId = null;
+            const BATCH_SIZE = 100; // Reduced from 5000 to Force Pagination & avoid timeouts
+            let batchCount = 0;
+
+            console.log("Starting Transaction Sync...");
 
             while (true) {
+                batchCount++;
+                console.log(`Fetching Batch ${batchCount}... (LastID: ${lastId})`);
+
                 const queries = [
                     Query.equal('userId', user.$id),
                     Query.orderDesc('date'),
-                    Query.limit(5000) // Max allowed by Appwrite is 5000
+                    Query.limit(BATCH_SIZE)
                 ];
 
                 if (lastId) {
@@ -43,9 +50,11 @@ export const TransactionProvider = ({ children }) => {
                     queries
                 );
 
+                console.log(`Batch ${batchCount} received: ${response.documents.length} items.`);
                 allDocuments = [...allDocuments, ...response.documents];
 
-                if (response.documents.length < 5000) {
+                if (response.documents.length < BATCH_SIZE) {
+                    console.log("All transactions fetched. Total:", allDocuments.length);
                     break;
                 }
 
@@ -64,8 +73,24 @@ export const TransactionProvider = ({ children }) => {
 
             setTransactions(transformedTransactions);
         } catch (error) {
-            console.error('Error loading transactions:', error);
-            setTransactions([]);
+            console.error('CRITICAL Error loading transactions:', error);
+            // Don't wipe state on error, maybe keep old? For now, standard error handling
+            // If we fail mid-loop, we might have partial data. 
+            // Ideally we shouldn't setTransactions([]) unless it's a total failure.
+            if (allDocuments.length > 0) {
+                console.warn("Returning partial data due to error.");
+                const transformedTransactions = allDocuments.map(doc => ({
+                    id: doc.$id,
+                    type: doc.type,
+                    amount: doc.amount,
+                    category: doc.category,
+                    date: doc.date,
+                    note: doc.note || ''
+                }));
+                setTransactions(transformedTransactions);
+            } else {
+                setTransactions([]);
+            }
         } finally {
             setLoading(false);
         }
