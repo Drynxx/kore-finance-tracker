@@ -28,7 +28,8 @@ export const TransactionProvider = ({ children }) => {
                 COLLECTION_ID,
                 [
                     Query.equal('userId', user.$id),
-                    Query.orderDesc('date')
+                    Query.orderDesc('date'),
+                    Query.limit(5000)
                 ]
             );
 
