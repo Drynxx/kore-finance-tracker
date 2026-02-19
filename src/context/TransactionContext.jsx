@@ -23,18 +23,37 @@ export const TransactionProvider = ({ children }) => {
     const loadTransactions = async () => {
         try {
             setLoading(true);
-            const response = await databases.listDocuments(
-                DATABASE_ID,
-                COLLECTION_ID,
-                [
+            let allDocuments = [];
+            let lastId = null;
+
+            while (true) {
+                const queries = [
                     Query.equal('userId', user.$id),
                     Query.orderDesc('date'),
-                    Query.limit(5000)
-                ]
-            );
+                    Query.limit(5000) // Max allowed by Appwrite is 5000
+                ];
+
+                if (lastId) {
+                    queries.push(Query.cursorAfter(lastId));
+                }
+
+                const response = await databases.listDocuments(
+                    DATABASE_ID,
+                    COLLECTION_ID,
+                    queries
+                );
+
+                allDocuments = [...allDocuments, ...response.documents];
+
+                if (response.documents.length < 5000) {
+                    break;
+                }
+
+                lastId = response.documents[response.documents.length - 1].$id;
+            }
 
             // Transform Appwrite documents to our transaction format
-            const transformedTransactions = response.documents.map(doc => ({
+            const transformedTransactions = allDocuments.map(doc => ({
                 id: doc.$id,
                 type: doc.type,
                 amount: doc.amount,
