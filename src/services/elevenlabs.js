@@ -43,9 +43,6 @@ export const speakWithElevenLabs = async (text) => {
         console.error("ElevenLabs TTS Failed:", error);
         // alert(`ElevenLabs Error: ${error.message}`); // Disabled for production
         // Fallback to browser TTS if ElevenLabs fails
-        if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            window.speechSynthesis.speak(utterance);
-        }
+        // console.warn("ElevenLabs Failed, but fallback is disabled per user request.");
     }
 };

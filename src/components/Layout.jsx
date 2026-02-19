@@ -1,14 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Plus, List, Wallet, Settings, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SettingsModal } from './SettingsModal';
 import { AIAssistantModal } from './AIAssistantModal';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import IntroAnimation from './IntroAnimation';
 
 const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
     const { user } = useAuth();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isAIOpen, setIsAIOpen] = useState(false);
+    const [showIntro, setShowIntro] = useState(false);
+
+    useEffect(() => {
+        const hasSeen = sessionStorage.getItem('hasSeenIntro');
+        if (user && !hasSeen) {
+            setShowIntro(true);
+            sessionStorage.setItem('hasSeenIntro', 'true');
+        }
+    }, [user]);
 
     const DockIcon = ({ icon: Icon, label, isActive, onClick }) => {
         const isAI = label === 'Kore Assistant';
@@ -186,6 +196,10 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
             {isAIOpen && (
                 <AIAssistantModal onClose={() => setIsAIOpen(false)} />
             )}
+
+            <AnimatePresence>
+                {showIntro && <IntroAnimation key="intro" onComplete={() => setShowIntro(false)} />}
+            </AnimatePresence>
         </div>
     );
 };
