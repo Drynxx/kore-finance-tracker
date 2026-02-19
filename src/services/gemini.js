@@ -93,13 +93,8 @@ export const parseTransactionWithGemini = async (text, history = []) => {
         console.log("Raw Gemini Response:", text);
 
         try {
-            // Helper to clean markdown json code blocks
-            const cleanJson = (str) => {
-                return str.replace(/```json\n?|\n?```/g, '').trim();
-            };
-
-            const cleanedText = cleanJson(text);
-            return JSON.parse(cleanedText);
+            // Use new robust extractor
+            return extractAndParseJson(text);
         } catch (parseError) {
             console.error("JSON Parse Error:", parseError, "Response Text:", text);
             throw new Error(`Failed to parse AI response. Raw: ${text.substring(0, 50)}...`);
@@ -156,11 +151,17 @@ export const generateCashFlowForecast = async (transactions, currentBalance) => 
         const response = await result.response;
         const text = response.text();
 
-        const cleanJson = (str) => {
-            return str.replace(/```json\n?|\n?```/g, '').trim();
-        };
+        // Use new robust extractor
+        const data = extractAndParseJson(text);
 
-        return JSON.parse(cleanJson(text));
+        // Ensure it is an array
+        if (Array.isArray(data)) {
+            return data;
+        } else {
+            console.warn("Gemini Oracle returned object instead of array", data);
+            return [];
+        }
+
     } catch (error) {
         console.error("Gemini Forecast Error:", error);
         return [];
@@ -168,6 +169,38 @@ export const generateCashFlowForecast = async (transactions, currentBalance) => 
 };
 
 
+
+// Helper to robustly extract and parse JSON from AI text
+const extractAndParseJson = (text) => {
+    try {
+        // 1. Try finding JSON array first (common for oracle)
+        const arrayStart = text.indexOf('[');
+        const arrayEnd = text.lastIndexOf(']');
+
+        if (arrayStart !== -1 && arrayEnd !== -1 && arrayEnd > arrayStart) {
+            const jsonStr = text.substring(arrayStart, arrayEnd + 1);
+            return JSON.parse(jsonStr);
+        }
+
+        // 2. Try finding JSON object
+        const objectStart = text.indexOf('{');
+        const objectEnd = text.lastIndexOf('}');
+
+        if (objectStart !== -1 && objectEnd !== -1 && objectEnd > objectStart) {
+            const jsonStr = text.substring(objectStart, objectEnd + 1);
+            return JSON.parse(jsonStr);
+        }
+
+        // 3. Fallback: Try simple cleanup if no brackets found (legacy behavior)
+        const cleanStr = text.replace(/```json\n?|\n?```/g, '').trim();
+        return JSON.parse(cleanStr);
+
+    } catch (error) {
+        console.error("JSON Extraction Failed:", error);
+        console.error("Raw Text:", text);
+        throw new Error("Failed to extract valid JSON from AI response");
+    }
+};
 
 export const suggestCategory = async (note, existingCategories) => {
     // Rate Limit: 5 requests per 10 seconds
@@ -200,10 +233,10 @@ export const suggestCategory = async (note, existingCategories) => {
 
         const response = await result.response;
         const text = response.text();
-        const cleanJson = (str) => str.replace(/```json\n?|\n?```/g, '').trim();
-        const data = JSON.parse(cleanJson(text));
 
-        return data.category;
+        const data = extractAndParseJson(text);
+        return data?.category || null;
+
     } catch (error) {
         console.error("Gemini Categorization Error:", error);
         return null;
