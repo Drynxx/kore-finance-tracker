@@ -3,6 +3,7 @@ import { LayoutDashboard, Plus, List, Wallet, Settings, Bot } from 'lucide-react
 import { useAuth } from '../context/AuthContext';
 import { SettingsModal } from './SettingsModal';
 import { AIAssistantModal } from './AIAssistantModal';
+import { ReloadPrompt } from './ReloadPrompt';
 import { motion } from 'framer-motion';
 
 const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
@@ -96,6 +97,7 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-indigo-500/20">
                         {user?.name?.charAt(0) || 'U'}
                     </div>
+                    <span className="text-[10px] text-slate-600 font-mono mt-2">v1.1</span>
                 </div>
             </motion.aside>
 
@@ -112,8 +114,10 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                         {user?.name?.charAt(0) || 'U'}
                     </div>
 
-                    {/* Right Side - Empty for balance */}
-                    <div className="w-8 h-8" />
+                    {/* Right Side - Version Indicator (Debug) */}
+                    <div className="w-8 flex items-center justify-center">
+                        <span className="text-[10px] text-slate-500 font-mono">v1.1</span>
+                    </div>
                 </div>
             </header>
 
@@ -186,6 +190,8 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
             {isAIOpen && (
                 <AIAssistantModal onClose={() => setIsAIOpen(false)} />
             )}
+
+            <ReloadPrompt />
         </div>
     );
 };
