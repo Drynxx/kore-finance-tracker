@@ -1,4 +1,4 @@
-const key = process.env.VITE_GEMINI_API_KEY || "AIzaSyBrJT7Zn7EpJb0QdiptPoyIxheIpnQfx4U";
+const key = process.env.VITE_GEMINI_API_KEY;
 const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
 
 console.log("Listing models from:", url.replace(key, "HIDDEN_KEY"));
