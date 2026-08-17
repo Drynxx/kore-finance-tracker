@@ -78,8 +78,8 @@ export const AuthProvider = ({ children }) => {
 
     const sendVerificationEmail = async () => {
         try {
-            // Redirect back to the app's root url
-            await account.createVerification(`${window.location.origin}/verify`);
+            const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+            await account.createVerification(`${baseUrl}/verify`);
             return { success: true };
         } catch (error) {
             console.error('Verification email error:', error);
@@ -108,8 +108,8 @@ export const AuthProvider = ({ children }) => {
 
     const sendPasswordReset = async (email) => {
         try {
-            // Redirect back to the app's root url with type=recovery
-            await account.createRecovery(email, `${window.location.origin}?type=recovery`);
+            const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+            await account.createRecovery(email, `${baseUrl}?type=recovery`);
             return { success: true };
         } catch (error) {
             console.error('Password reset error:', error);

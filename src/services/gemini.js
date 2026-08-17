@@ -1,104 +1,29 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { rateLimiter } from '../utils/rateLimiter';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-console.log("Gemini Service Loaded. Key present:", !!API_KEY);
+// Check if API service is available (client-side check for proxy configuration)
+export const checkApiKey = () => true;
 
-let genAI = null;
-let model = null;
+const callGeminiProxy = async (action, payload) => {
+    const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action, payload }),
+    });
 
-if (API_KEY) {
-    genAI = new GoogleGenerativeAI(API_KEY);
-    model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-} else {
-    console.error("Gemini API Key is missing! Make sure VITE_GEMINI_API_KEY is set in .env");
-}
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Proxy returned HTTP status ${response.status}`);
+    }
 
-export const checkApiKey = () => !!API_KEY;
+    const data = await response.json();
+    return data.result;
+};
 
 export const parseTransactionWithGemini = async (text, history = []) => {
-    if (!model) {
-        throw new Error("Gemini API is not configured. Please check your settings.");
-    }
-
-    // Prepare history context (limit to last 50 transactions to save tokens/latency)
-    const recentHistory = history.slice(0, 50).map(t => ({
-        date: t.date,
-        amount: t.amount,
-        category: t.category,
-        note: t.note,
-        type: t.type
-    }));
-
-    const prompt = `
-    Current Date: ${new Date().toISOString().split('T')[0]}
-    Transaction History: ${JSON.stringify(recentHistory)}
-    User Input: "${text}"
-
-    You are a smart financial assistant. Analyze the User Input and determine the INTENT.
-    The user may speak in English or Romanian.
-    If the input is in Romanian, the "conversational_response" MUST be in Romanian.
-    If the input is in English, the "conversational_response" MUST be in English.
-
-    ---
-    INTENT 1: ADD_TRANSACTION
-    Trigger: User wants to log an expense or income (e.g., "Spent 50 on pizza", "Salary came in", "Am cheltuit 50 lei pe pizza", "A intrat salariul").
-    Output JSON:
-    {
-        "intent": "add",
-        "type": "expense" | "income",
-        "amount": number,
-        "category": "Food" | "Rent" | "Salary" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Other",
-        "note": "short description (keep original language)",
-        "date": "YYYY-MM-DD",
-        "conversational_response": "Added 50 lei for pizza. / Am adăugat 50 lei pentru pizza."
-    }
-
-    ---
-    INTENT 2: QUERY
-    Trigger: User asks a question about their finances (e.g., "How much did I spend on food?", "Cat am cheltuit pe mancare?").
-    Action: Analyze the "Transaction History" provided above to answer the question accurately.
-    Output JSON:
-    {
-        "intent": "query",
-        "conversational_response": "You spent a total of 450 lei on Food. / Ai cheltuit un total de 450 lei pe Mâncare."
-    }
-
-    ---
-    INTENT 3: FORECAST
-    Trigger: User asks about future spending or prediction (e.g., "How much will I spend next month?", "Cat crezi ca o sa cheltui luna viitoare?", "spending forecast").
-    Action: Analyze the "Transaction History" (recurrence, average spending) to Estimate the total for the requested period.
-    Output JSON:
-    {
-        "intent": "forecast",
-        "conversational_response": "Based on your spending habits, I predict you will spend around 2500 lei next month. / Bazat pe istoricul tău, preconizez că vei cheltui aproximativ 2500 lei luna viitoare."
-    }
-
-    ---
-    Rules:
-    1. Detect the language of the "User Input".
-    2. Respond in the SAME language as the input.
-    3. For ADD, default to "expense" if unclear.
-    4. Output STRICTLY valid JSON.
-    `;
-
     try {
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-        });
-
-        const response = await result.response;
-        const text = response.text();
-        console.log("Raw Gemini Response:", text);
-
-        try {
-            // Use new robust extractor
-            return extractAndParseJson(text);
-        } catch (parseError) {
-            console.error("JSON Parse Error:", parseError, "Response Text:", text);
-            throw new Error(`Failed to parse AI response. Raw: ${text.substring(0, 50)}...`);
-        }
+        return await callGeminiProxy('parseTransaction', { text, history });
     } catch (error) {
         console.error("Gemini Error:", error);
         throw new Error(`AI Error: ${error.message || "Unknown error"}`);
@@ -106,99 +31,12 @@ export const parseTransactionWithGemini = async (text, history = []) => {
 };
 
 export const generateCashFlowForecast = async (transactions, currentBalance) => {
-    if (!model) return [];
-
-    // 1. Prepare Context: Last 90 days of history
-    const today = new Date();
-    const ninetyDaysAgo = new Date(today);
-    ninetyDaysAgo.setDate(today.getDate() - 90);
-
-    const history = transactions
-        .filter(t => new Date(t.date) >= ninetyDaysAgo)
-        .map(t => ({
-            date: t.date,
-            amount: t.amount, // + for income, - for expense
-            category: t.category,
-            note: t.note
-        }));
-
-    const prompt = `
-    Current Date: ${today.toISOString().split('T')[0]}
-    Current Balance: ${currentBalance}
-    Transaction History (Last 90 Days): ${JSON.stringify(history)}
-
-    GOAL: Forecast the daily balance for the NEXT 30 DAYS.
-
-    INSTRUCTIONS:
-    1. Analyze the history to identify RECURRING bills/income (e.g., Rent, Salary, Subscriptions) based on amount and day of month.
-    2. Estimate average daily VARIABLE spending (Food, Transport, etc.).
-    3. Generate a daily forecast starting from tomorrow.
-    4. For each day, calculate the projected balance.
-
-    OUTPUT FORMAT:
-    Return a STRICT JSON array of objects:
-    [
-        { "date": "YYYY-MM-DD", "balance": number, "reason": "Salary" | "Rent" | "Estimated Spending" | null }
-    ]
-    `;
-
     try {
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-        });
-
-        const response = await result.response;
-        const text = response.text();
-
-        // Use new robust extractor
-        const data = extractAndParseJson(text);
-
-        // Ensure it is an array
-        if (Array.isArray(data)) {
-            return data;
-        } else {
-            console.warn("Gemini Oracle returned object instead of array", data);
-            return [];
-        }
-
+        const data = await callGeminiProxy('generateForecast', { transactions, currentBalance });
+        return Array.isArray(data) ? data : [];
     } catch (error) {
         console.error("Gemini Forecast Error:", error);
         return [];
-    }
-};
-
-
-
-// Helper to robustly extract and parse JSON from AI text
-const extractAndParseJson = (text) => {
-    try {
-        // 1. Try finding JSON array first (common for oracle)
-        const arrayStart = text.indexOf('[');
-        const arrayEnd = text.lastIndexOf(']');
-
-        if (arrayStart !== -1 && arrayEnd !== -1 && arrayEnd > arrayStart) {
-            const jsonStr = text.substring(arrayStart, arrayEnd + 1);
-            return JSON.parse(jsonStr);
-        }
-
-        // 2. Try finding JSON object
-        const objectStart = text.indexOf('{');
-        const objectEnd = text.lastIndexOf('}');
-
-        if (objectStart !== -1 && objectEnd !== -1 && objectEnd > objectStart) {
-            const jsonStr = text.substring(objectStart, objectEnd + 1);
-            return JSON.parse(jsonStr);
-        }
-
-        // 3. Fallback: Try simple cleanup if no brackets found (legacy behavior)
-        const cleanStr = text.replace(/```json\n?|\n?```/g, '').trim();
-        return JSON.parse(cleanStr);
-
-    } catch (error) {
-        console.error("JSON Extraction Failed:", error);
-        console.error("Raw Text:", text);
-        throw new Error("Failed to extract valid JSON from AI response");
     }
 };
 
@@ -209,34 +47,10 @@ export const suggestCategory = async (note, existingCategories) => {
         return null;
     }
 
-    if (!model || !note.trim()) return null;
-
-    const prompt = `
-    You are a categorization assistant. 
-    Analyze the transaction note: "${note}".
-    Map it to one of these existing categories: ${JSON.stringify(existingCategories)}.
-    
-    Rules:
-    1. If it clearly fits an existing category, return that category.
-    2. If it does not fit, suggest a NEW, short, generic category name (One word, Capitalized, English).
-    3. Be smart about cultural context (e.g., "Mega Image" is Food/Groceries).
-
-    Output STRICT JSON:
-    { "category": "CategoryName" }
-    `;
+    if (!note || !note.trim()) return null;
 
     try {
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-        });
-
-        const response = await result.response;
-        const text = response.text();
-
-        const data = extractAndParseJson(text);
-        return data?.category || null;
-
+        return await callGeminiProxy('suggestCategory', { note, existingCategories });
     } catch (error) {
         console.error("Gemini Categorization Error:", error);
         return null;

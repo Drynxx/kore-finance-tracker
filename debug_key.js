@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-const apiKey = process.env.VITE_GEMINI_API_KEY;
+const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 console.log("Checking Key:", apiKey ? "Present (" + apiKey.slice(0, 5) + "...)" : "MISSING");
 
 async function checkModels() {

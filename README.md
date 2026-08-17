@@ -71,7 +71,7 @@ With its "Glassmorphism" design language, fluid animations, and the powerful **K
     VITE_APPWRITE_DATABASE_ID=your_database_id
     VITE_APPWRITE_COLLECTION_ID=your_collection_id
     VITE_APPWRITE_WALLPAPER_BUCKET_ID=your_bucket_id
-    VITE_GEMINI_API_KEY=your_gemini_api_key
+    GEMINI_API_KEY=your_gemini_api_key  # Server-side environment variable (Vercel / Node proxy)
     ```
 
 4.  **Run Development Server**
