@@ -2,23 +2,23 @@ import React, { useState } from 'react';
 import { TransactionProvider } from './context/TransactionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CurrencyProvider } from './context/CurrencyContext';
+import { BiometricProvider, useBiometrics } from './context/BiometricContext';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
 import { AddTransactionModal } from './components/AddTransactionModal';
 import { AuthScreens } from './components/AuthScreens';
 import { NatureBackground } from './components/NatureBackground';
-
 import { WallpaperProvider } from './context/WallpaperContext';
-
 import { VerificationPending } from './components/VerificationPending';
-
 import { ResetPassword } from './components/ResetPassword';
 import { QuickLogHandler } from './components/QuickLogHandler';
+import { BiometricLockScreen } from './components/BiometricLockScreen';
 
-// Wrapper component to handle auth state
+// Wrapper component to handle auth state & biometrics
 const AppContent = () => {
   const { user, loading, completeVerification } = useAuth();
+  const { isLocked, isEnabled: biometricEnabled } = useBiometrics();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -102,6 +102,16 @@ const AppContent = () => {
     );
   }
 
+  // Enforce Biometric Lock Screen if enabled on device
+  if (biometricEnabled && isLocked) {
+    return (
+      <WallpaperProvider>
+        <NatureBackground />
+        <BiometricLockScreen />
+      </WallpaperProvider>
+    );
+  }
+
   return (
     <WallpaperProvider>
       <CurrencyProvider>
@@ -129,10 +139,11 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <BiometricProvider>
+        <AppContent />
+      </BiometricProvider>
     </AuthProvider>
   );
 }
 
 export default App;
-

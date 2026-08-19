@@ -1,8 +1,9 @@
 import React, { useState, useContext } from 'react';
-import { X, Settings, Image as ImageIcon, DollarSign, User, LogOut, Check, RefreshCw, FileText, FileDown, ChevronRight, SwitchCamera } from 'lucide-react';
+import { X, Settings, Image as ImageIcon, DollarSign, User, LogOut, Check, RefreshCw, FileText, FileDown, ChevronRight, SwitchCamera, Fingerprint, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useWallpaper } from '../context/WallpaperContext';
+import { useBiometrics } from '../context/BiometricContext';
 import { TransactionContext } from '../context/TransactionContext';
 import { storage, WALLPAPER_BUCKET_ID } from '../lib/appwrite';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,7 +14,29 @@ const SettingsModal = ({ onClose }) => {
     const { currency, changeCurrency, currencies } = useCurrency();
     const { wallpapers, selectWallpaper, isAutoRotating, toggleAutoRotation, wallpaperUrl } = useWallpaper();
     const { transactions } = useContext(TransactionContext);
+    const { isSupported: biometricSupported, isEnabled: biometricEnabled, enable: enableBiometrics, disable: disableBiometrics } = useBiometrics();
+    
     const [activeTab, setActiveTab] = useState('appearance');
+    const [isBiometricLoading, setIsBiometricLoading] = useState(false);
+    const [biometricMsg, setBiometricMsg] = useState('');
+
+    const handleBiometricToggle = async () => {
+        setIsBiometricLoading(true);
+        setBiometricMsg('');
+        try {
+            if (biometricEnabled) {
+                disableBiometrics();
+                setBiometricMsg('Biometric lock disabled.');
+            } else {
+                await enableBiometrics(user?.email || 'user@kore.app', user?.name || 'Kore User');
+                setBiometricMsg('Hardware Face ID / Fingerprint registered successfully!');
+            }
+        } catch (err) {
+            setBiometricMsg(err.message || 'Failed to update biometric enrollment.');
+        } finally {
+            setIsBiometricLoading(false);
+        }
+    };
 
     const tabs = [
         { id: 'appearance', label: 'Appearance', icon: ImageIcon, desc: 'Wallpaper & Theme' },
@@ -227,6 +250,55 @@ const SettingsModal = ({ onClose }) => {
                                                     Active Session
                                                 </div>
                                             </div>
+                                        </div>
+                                    </section>
+
+                                    {/* Biometric Security Section */}
+                                    <section className="space-y-3 md:space-y-4">
+                                        <h4 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wider pl-1">Hardware Biometrics</h4>
+                                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                                                        biometricEnabled 
+                                                            ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400' 
+                                                            : 'bg-white/5 border-white/10 text-slate-400'
+                                                    }`}>
+                                                        <Fingerprint size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h5 className="text-sm md:text-base font-semibold text-white">Face ID & Fingerprint Lock</h5>
+                                                        <p className="text-xs text-slate-400">
+                                                            {biometricSupported
+                                                                ? 'Sub-second hardware biometric access'
+                                                                : 'Not supported on this browser/hardware'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {biometricSupported && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={isBiometricLoading}
+                                                        onClick={handleBiometricToggle}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                                            biometricEnabled ? 'bg-indigo-600' : 'bg-slate-700'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                                biometricEnabled ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {biometricMsg && (
+                                                <p className="text-xs text-indigo-300 bg-indigo-950/40 border border-indigo-500/20 p-2.5 rounded-xl font-medium">
+                                                    {biometricMsg}
+                                                </p>
+                                            )}
                                         </div>
                                     </section>
 
