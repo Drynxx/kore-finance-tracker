@@ -10,7 +10,7 @@ With this pipeline, speaking a transaction like *"Spent 15 RON on coffee at Star
 
 ## 📱 Option 1: Apple iOS (Siri & Apple Shortcuts)
 
-You can trigger voice expense logging on iPhone and iPad via **Siri** ("*Hey Siri, Log Expense*"), the **Action Button** (iPhone 15 Pro / 16), or **Back Tap**.np
+You can trigger voice expense logging on iPhone and iPad via **Siri** ("*Hey Siri, Log Expense*"), the **Action Button** (iPhone 15 Pro / 16), or **Back Tap**.
 
 ### 🛠️ Step-by-Step Shortcut Creation
 

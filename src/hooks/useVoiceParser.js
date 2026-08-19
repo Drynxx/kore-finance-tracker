@@ -79,7 +79,7 @@ export const useVoiceParser = () => {
             if (clientApiKey) {
                 try {
                     const genAI = new GoogleGenerativeAI(clientApiKey);
-                    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+                    const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
                     
                     const prompt = `${SYSTEM_PROMPT}\nUser Voice Input: "${rawText.trim()}"`;
                     const res = await model.generateContent({
