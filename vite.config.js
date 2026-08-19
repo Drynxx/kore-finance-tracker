@@ -52,6 +52,15 @@ export default defineConfig({
             protocol: 'web+kore',
             url: '/quick-log?text=%s'
           }
+        ],
+        shortcuts: [
+          {
+            name: "Quick Voice Log",
+            short_name: "Voice Log",
+            description: "Instant voice expense logging",
+            url: "/quick-log",
+            icons: [{ src: "logo.png", sizes: "192x192" }]
+          }
         ]
       }
     })

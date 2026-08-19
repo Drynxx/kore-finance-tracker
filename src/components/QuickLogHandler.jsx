@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useVoiceParser } from '../hooks/useVoiceParser';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { databases, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
 import { ID } from 'appwrite';
-import { CheckCircle2, AlertCircle, Sparkles, CreditCard, Banknote, ArrowRight, RefreshCw, Mic, Volume2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Sparkles, CreditCard, Banknote, ArrowRight, RefreshCw, Mic, MicOff, Globe, StopCircle } from 'lucide-react';
 
 /**
  * Extracts voice text from URL parameters or protocol handler payloads.
@@ -53,12 +54,16 @@ export const QuickLogHandler = () => {
     const { user, loading: authLoading } = useAuth();
     const { parseVoiceInput, isParsing, error: parseError } = useVoiceParser();
 
+    const [language, setLanguage] = useState('ro-RO');
+    const { isListening, transcript, startListening, stopListening, isSupported } = useSpeechRecognition(language);
+
     const [status, setStatus] = useState('idle'); // 'idle' | 'processing' | 'saving' | 'success' | 'error' | 'no-input'
     const [extractedText, setExtractedText] = useState('');
     const [manualInput, setManualInput] = useState('');
     const [parsedResult, setParsedResult] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
     const hasProcessedRef = useRef(false);
+    const autoStartedRef = useRef(false);
 
     // Initial Mount: Trigger light haptic feedback and extract query text
     useEffect(() => {
@@ -78,7 +83,28 @@ export const QuickLogHandler = () => {
         }
     }, []);
 
-    // Process ingestion once auth is confirmed and text is available
+    // Auto-start microphone if no URL text was supplied (e.g. from Android Home Screen 1-tap shortcut)
+    useEffect(() => {
+        if (status === 'no-input' && isSupported && !autoStartedRef.current && !authLoading && user) {
+            autoStartedRef.current = true;
+            try {
+                startListening();
+            } catch (e) {
+                console.debug("Auto-start microphone prevented by browser autoplay policy:", e);
+            }
+        }
+    }, [status, isSupported, authLoading, user, startListening]);
+
+    // When speech transcript stops and has text, process automatically
+    useEffect(() => {
+        if (status === 'no-input' && !isListening && transcript && transcript.trim().length > 3 && !hasProcessedRef.current) {
+            hasProcessedRef.current = true;
+            setExtractedText(transcript.trim());
+            processVoiceText(transcript.trim());
+        }
+    }, [status, isListening, transcript]);
+
+    // Process ingestion once auth is confirmed and URL text is available
     useEffect(() => {
         if (authLoading) return;
 
@@ -88,14 +114,15 @@ export const QuickLogHandler = () => {
             return;
         }
 
-        if (extractedText && !hasProcessedRef.current && status !== 'success' && status !== 'error') {
+        if (extractedText && !hasProcessedRef.current && status !== 'success' && status !== 'error' && status !== 'no-input') {
             hasProcessedRef.current = true;
             processVoiceText(extractedText);
         }
-    }, [authLoading, user, extractedText]);
+    }, [authLoading, user, extractedText, status]);
 
     const processVoiceText = async (textToProcess) => {
         try {
+            stopListening();
             setStatus('processing');
             setErrorMessage('');
 
@@ -135,7 +162,7 @@ export const QuickLogHandler = () => {
                 }
             }
 
-            // Step 4: Auto-close after 1 second or redirect to dashboard
+            // Step 4: Auto-close after 1.2 seconds or redirect to dashboard
             setTimeout(() => {
                 try {
                     window.close();
@@ -146,7 +173,7 @@ export const QuickLogHandler = () => {
                 setTimeout(() => {
                     window.location.href = '/';
                 }, 400);
-            }, 1000);
+            }, 1200);
 
         } catch (err) {
             console.error("Quick log processing failed:", err);
@@ -166,8 +193,20 @@ export const QuickLogHandler = () => {
         window.location.href = '/';
     };
 
+    const toggleListening = () => {
+        if (isListening) {
+            stopListening();
+            if (transcript && transcript.trim().length > 2) {
+                setExtractedText(transcript.trim());
+                processVoiceText(transcript.trim());
+            }
+        } else {
+            startListening();
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden bg-slate-950/80 backdrop-blur-2xl selection:bg-indigo-500/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden bg-slate-950/85 backdrop-blur-2xl selection:bg-indigo-500/30">
             {/* Ambient Background Aura */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
                 <motion.div
@@ -224,7 +263,7 @@ export const QuickLogHandler = () => {
                                     {status === 'saving' ? 'Saving Transaction...' : 'Kore Agent processing...'}
                                 </h3>
                                 <p className="text-xs text-slate-400 max-w-xs line-clamp-2 px-2 font-mono">
-                                    "{extractedText || 'Extracting parameters...'}"
+                                    "{extractedText || transcript || 'Extracting parameters...'}"
                                 </p>
                             </div>
 
@@ -298,13 +337,13 @@ export const QuickLogHandler = () => {
                                 </div>
 
                                 <p className="text-xs text-slate-400 italic truncate border-t border-white/5 pt-2">
-                                    "{extractedText}"
+                                    "{extractedText || transcript}"
                                 </p>
                             </div>
                         </motion.div>
                     )}
 
-                    {/* STATE 3: NO INPUT / MANUAL FALLBACK */}
+                    {/* STATE 3: LIVE SPEECH RECORDING & 1-TAP ACTION (Instant Android & Web Voice) */}
                     {status === 'no-input' && (
                         <motion.div
                             key="no-input"
@@ -312,36 +351,85 @@ export const QuickLogHandler = () => {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -8 }}
                             transition={{ duration: 0.2 }}
-                            className="flex flex-col items-center space-y-4 w-full my-2"
+                            className="flex flex-col items-center space-y-4 w-full my-1"
                         >
-                            <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                                <Mic className="w-7 h-7" />
-                            </div>
+                            {/* Animated Glowing Microphone Button */}
+                            <div className="relative flex items-center justify-center my-2">
+                                {isListening && (
+                                    <>
+                                        <motion.div
+                                            animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.7, 0.3] }}
+                                            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                                            className="absolute w-24 h-24 rounded-full bg-indigo-500/30 blur-md"
+                                        />
+                                        <motion.div
+                                            animate={{ scale: [1, 1.8, 1], opacity: [0.15, 0.4, 0.15] }}
+                                            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+                                            className="absolute w-32 h-32 rounded-full bg-cyan-500/20 blur-lg"
+                                        />
+                                    </>
+                                )}
 
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-semibold text-white">Voice Shortcut Active</h3>
-                                <p className="text-xs text-slate-400">
-                                    No speech payload detected in URL. Type or speak an expense:
-                                </p>
-                            </div>
-
-                            <form onSubmit={handleManualSubmit} className="w-full space-y-3">
-                                <input
-                                    type="text"
-                                    value={manualInput}
-                                    onChange={(e) => setManualInput(e.target.value)}
-                                    placeholder="e.g. Spent 25 RON on taxi with card"
-                                    className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    autoFocus
-                                />
                                 <button
-                                    type="submit"
-                                    disabled={!manualInput.trim()}
-                                    className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-sm transition-colors shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2"
+                                    type="button"
+                                    onClick={toggleListening}
+                                    className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl ${
+                                        isListening
+                                            ? 'bg-gradient-to-tr from-rose-500 to-indigo-600 shadow-rose-500/30 scale-105'
+                                            : 'bg-gradient-to-tr from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-indigo-500/30'
+                                    }`}
                                 >
-                                    <span>Process Transaction</span>
-                                    <ArrowRight className="w-4 h-4" />
+                                    {isListening ? (
+                                        <Mic className="w-9 h-9 text-white animate-pulse" />
+                                    ) : (
+                                        <Mic className="w-9 h-9 text-white" />
+                                    )}
                                 </button>
+                            </div>
+
+                            {/* Voice Status & Live Transcript */}
+                            <div className="space-y-1 w-full">
+                                <h3 className="text-lg font-semibold text-white">
+                                    {isListening ? "Listening... Speak your expense" : "Tap to Speak"}
+                                </h3>
+                                <div className="min-h-[38px] px-3 py-1.5 rounded-xl bg-black/20 border border-white/5 flex items-center justify-center">
+                                    <p className="text-xs text-indigo-200 font-mono italic truncate">
+                                        {transcript ? `"${transcript}"` : "e.g. Spent 25 lei on coffee at Starbucks with card"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Language Switcher */}
+                            <div className="flex items-center justify-center gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setLanguage(l => l === 'ro-RO' ? 'en-US' : 'ro-RO')}
+                                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-slate-300 flex items-center gap-1.5 transition-colors"
+                                >
+                                    <Globe className="w-3 h-3 text-indigo-400" />
+                                    <span>Language: {language === 'ro-RO' ? '🇷🇴 RO' : '🇺🇸 EN'}</span>
+                                </button>
+                            </div>
+
+                            {/* Or Type Manually */}
+                            <form onSubmit={handleManualSubmit} className="w-full pt-2 space-y-2">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={manualInput}
+                                        onChange={(e) => setManualInput(e.target.value)}
+                                        placeholder="Or type expense here..."
+                                        className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    {manualInput.trim() && (
+                                        <button
+                                            type="submit"
+                                            className="absolute right-1.5 top-1.5 bottom-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-xs flex items-center justify-center"
+                                        >
+                                            <ArrowRight className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
                             </form>
                         </motion.div>
                     )}
@@ -368,9 +456,9 @@ export const QuickLogHandler = () => {
                             </div>
 
                             <div className="flex gap-2.5 w-full pt-2">
-                                {extractedText && (
+                                {(extractedText || transcript) && (
                                     <button
-                                        onClick={() => processVoiceText(extractedText)}
+                                        onClick={() => processVoiceText(extractedText || transcript)}
                                         className="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-white/10 transition-colors flex items-center justify-center gap-1.5"
                                     >
                                         <RefreshCw className="w-3.5 h-3.5" />

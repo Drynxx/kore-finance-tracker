@@ -1,14 +1,12 @@
 # 🎙️ Kore OS Voice Shortcuts Setup Guide
 
-This guide provides step-by-step instructions for integrating **Kore - Financial Intelligence** directly with native OS voice assistants:
-- **Apple iOS (Siri, Shortcuts & Action Button)**
-- **Android (Google Assistant & Web Share Target)**
+This guide provides complete instructions for integrating **Kore - Financial Intelligence** directly with native OS voice assistants and shortcuts on both **Apple iOS** and **Android (including devices using Google Gemini)**.
 
 With this pipeline, speaking a transaction like *"Spent 15 RON on coffee at Starbucks with card"* will parse the natural language with Google Gemini, store it in Appwrite, and give haptic/visual confirmation in **under 3 seconds**.
 
 ---
 
-## 📱 Option 1: Apple iOS (Siri & Apple Shortcuts)
+## 📱 Option 1: Apple iOS (Siri, Shortcuts & Action Button)
 
 You can trigger voice expense logging on iPhone and iPad via **Siri** ("*Hey Siri, Log Expense*"), the **Action Button** (iPhone 15 Pro / 16), or **Back Tap**.
 
@@ -53,53 +51,78 @@ graph TD
 
 5. Tap **Done** in the top right.
 
----
-
-### 🚀 How to Use on iOS
-
-*   **Via Siri:**
-    *   Say: *"Hey Siri, Log Expense"*
-    *   Siri will prompt for dictation. Speak: *"Spent 45 lei on Uber by card"*
-    *   Kore will open, Gemini will parse the text, Appwrite will record the transaction, and the screen will confirm with haptic vibration before auto-closing.
-*   **Via Action Button (iPhone 15 Pro / 16):**
-    *   Go to **Settings > Action Button**.
-    *   Swipe to **Shortcut** and choose **`Log Expense`**.
-    *   Press and hold the Action Button anytime to instantly speak and log an expense.
-*   **Via Back Tap (Any iPhone):**
-    *   Go to **Settings > Accessibility > Touch > Back Tap**.
-    *   Select **Double Tap** or **Triple Tap** and choose **`Log Expense`**.
+### 🚀 How to Use on iOS:
+*   **Via Siri:** Say *"Hey Siri, Log Expense"* $\rightarrow$ speak your expense $\rightarrow$ auto-saved!
+*   **Via Action Button (iPhone 15 Pro / 16):** Go to **Settings > Action Button** $\rightarrow$ choose **`Log Expense`**.
+*   **Via Back Tap (Any iPhone):** Go to **Settings > Accessibility > Touch > Back Tap** $\rightarrow$ choose **`Log Expense`**.
 
 ---
 
-## 🤖 Option 2: Android (Google Assistant & Web Share Target)
+## 🤖 Option 2: Android (Google Gemini, Assistant & Quick Actions)
 
-Android supports two high-speed methods: **Web Share Target** and **Google Assistant Routines**.
-
-### Method A: Web Share Target (Native Share Sheet)
-
-Kore's PWA Manifest registers a `share_target`. Any text highlighted in apps, notes, or messages can be piped straight into Kore.
-
-1. Highlight any transaction text or receipt summary on Android.
-2. Tap **Share**.
-3. Select **Kore Finance Tracker** from the native share sheet.
-4. Kore opens directly into `/quick-log`, parses the payload with Gemini, saves the document to Appwrite, and shows the confirmation checkmark.
+> [!NOTE]
+> **Why Google Assistant Routines show errors with Gemini:**
+> Google recently replaced legacy Google Assistant with the **Google Gemini app** on Android. Gemini does not yet support arbitrary URL-opening actions in Routines. 
+> Below are the **4 best, working alternatives** for modern Android devices.
 
 ---
 
-### Method B: Google Assistant Voice Routine
+### 🌟 Method A: Android Home Screen 1-Tap Voice Shortcut (Recommended - Easiest & Fastest)
 
-1. Open the **Google Assistant** app (or Google app settings) and go to **Settings > Routines**.
-2. Tap **`+ New Routine`**.
-3. Set **Starter (Voice Command)**:
-   *   Tap *Add starter* > *Voice command*.
-   *   Type: *"Log an expense"* or *"Note expense"*.
-4. Set **Action (Custom URL / Chrome intent)**:
-   *   Tap *Add action* > *Communicate and announce* or *Custom Command*.
-   *   Set command to open the PWA deep link:
-       ```text
-       https://kore-finance.vercel.app/quick-log?text=$
-       ```
-       *(Or use an automation tool like **Tasker** or **Macrodroid** to capture voice and trigger `web+kore://log?text=...`).*
+Kore's PWA Manifest defines a native Android App Shortcut that opens directly in auto-listening mode.
+
+1. Ensure Kore is installed as a PWA on your home screen (open Kore in Chrome $\rightarrow$ tap **Install app** or **Add to Home screen**).
+2. **Long-press (tap and hold)** the Kore app icon on your home screen.
+3. A popup menu appears showing **🎙️ Quick Voice Log**.
+4. **Drag and drop** the **"Quick Voice Log"** icon directly onto your home screen as a standalone widget icon.
+5. **How it works:**
+   - Tap the **Quick Voice Log** icon anytime.
+   - Kore instantly opens the sleek glassmorphic overlay and **automatically activates the microphone**.
+   - Speak your expense (e.g. *"Am cheltuit 35 lei la Mega Image"* or *"Spent 15 dollars on lunch"*).
+   - As soon as you pause, Gemini 3.6 Flash processes it, Appwrite saves it, and the screen confirms with haptic vibration before closing!
+
+---
+
+### ⚡ Method B: MacroDroid / Tasker (Exact Equivalent of Apple Shortcuts)
+
+If you want a physical gesture trigger (e.g. double-pressing the volume button, shaking your phone, or a Quick Settings swipe-down tile) without touching an app icon:
+
+1. Install **MacroDroid** (Free on Google Play Store).
+2. Tap **Add Macro**:
+   * **Trigger:** Choose your preferred trigger (e.g. *Volume Button Long Press*, *Shake Device*, or *Quick Settings Tile*).
+   * **Action 1:** Search for **Voice Input** $\rightarrow$ Save speech to a variable named `expense_text`.
+   * **Action 2:** Search for **Open Website / HTTP** $\rightarrow$ Enter URL:
+     ```text
+     https://kore-finance.vercel.app/quick-log?text={v=expense_text}
+     ```
+3. Save the Macro as **"Log Expense"**.
+4. Now whenever you trigger it, your phone listens to your voice and immediately sends it into Kore!
+
+---
+
+### 🔄 Method C: Switch Default Digital Assistant from Gemini to Google Assistant
+
+If you specifically want the *"Hey Google, Log Expense"* voice routine:
+
+1. Open your Android **Settings**.
+2. Search for **Default Digital Assistant** (or go to **Apps > Default Apps > Digital Assistant app**).
+3. Select **Google** (Google Assistant) instead of **Gemini**.
+4. Open the Google app $\rightarrow$ **Settings > Google Assistant > Routines**.
+5. Create a Routine:
+   - **Starter (Voice):** *"Log Expense"*
+   - **Action:** Open custom link `https://kore-finance.vercel.app/quick-log?text=$`
+6. Now saying *"Hey Google, Log Expense"* will route through the routine.
+
+---
+
+### 📤 Method D: Android Native Share Sheet (Web Share Target)
+
+Kore registers a `share_target` in the Android OS share sheet:
+
+1. Whenever you have text in any app, WhatsApp, SMS receipt, or banking notification:
+2. Highlight the text and tap **Share**.
+3. Select **Kore Finance Tracker**.
+4. Kore immediately opens `/quick-log`, parses the text with Gemini, and saves the transaction!
 
 ---
 
@@ -122,7 +145,7 @@ Gemini accurately extracts the amount, currency, category, payment method, and m
 
 1. **Protocol Handler Registration (`web+kore`):**
    * When you first open the installed PWA in Chrome / Edge, the browser may display a prompt asking: *"Allow Kore to handle web+kore links?"*. Tap **Allow**.
-2. **PWA Installation:**
-   * To ensure fastest startup, install Kore as a standalone PWA on your home screen via Safari (*Share > Add to Home Screen*) on iOS or Chrome (*Install App*) on Android.
+2. **Microphone Permissions:**
+   * On first launch in `/quick-log`, allow microphone access so the auto-listening voice feature can activate instantly.
 3. **Authentication:**
    * Ensure you are logged into your Kore account in the PWA. If logged out, the Quick Log screen will prompt you to log in once before resuming background voice capture.
