@@ -1,8 +1,12 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
 // Helper to robustly extract and parse JSON from AI text
 const extractAndParseJson = (text) => {
     try {
+        if (!text || typeof text !== 'string') {
+            throw new Error("Empty response from AI");
+        }
+
         const arrayStart = text.indexOf('[');
         const arrayEnd = text.lastIndexOf(']');
 
@@ -22,10 +26,17 @@ const extractAndParseJson = (text) => {
         const cleanStr = text.replace(/```json\n?|\n?```/g, '').trim();
         return JSON.parse(cleanStr);
     } catch (error) {
-        console.error("JSON Extraction Failed:", error);
+        console.error("JSON Extraction Failed on output:", text, error);
         throw new Error("Failed to extract valid JSON from AI response");
     }
 };
+
+const OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
+const OPENROUTER_FALLBACKS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "openai/gpt-oss-120b:free",
+    "google/gemma-4-26b-it:free"
+];
 
 export default async function handler(req, res) {
     // Only allow POST requests
@@ -33,10 +44,10 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed. Use POST.' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
-        return res.status(500).json({ error: 'Server configuration error: GEMINI_API_KEY is not set.' });
+        return res.status(500).json({ error: 'Server configuration error: OPENROUTER_API_KEY is not set in server environment.' });
     }
 
     const { action, payload } = req.body || {};
@@ -46,8 +57,14 @@ export default async function handler(req, res) {
     }
 
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+        const client = new OpenAI({
+            baseURL: "https://openrouter.ai/api/v1",
+            apiKey: apiKey,
+            defaultHeaders: {
+                "HTTP-Referer": "https://kore-finance.vercel.app",
+                "X-Title": "Kore Finance Tracker"
+            }
+        });
 
         if (action === 'parseVoiceShortcut') {
             const { text } = payload || {};
@@ -87,20 +104,23 @@ Rules & Extraction Guidelines:
 4. paymentMethod: "Card" if a digital service, online platform, ride-hailing (Uber, Bolt), delivery app (Glovo, Tazz, DoorDash), subscription (Netflix, Spotify, Apple, Google, Amazon), or card payment is mentioned. Default to "Cash" if cash is mentioned or payment method is unspecified.
 5. type: "income" for salary, received money, freelance payment, refunds. Default to "expense".
 6. merchant: clean brand, vendor, or store name if identified (e.g. "Starbucks", "Uber", "Lidl", "Mega Image"), or empty string "" if none mentioned.
-7. Return ONLY the raw JSON object.
+7. Return ONLY the raw JSON object. No Markdown fences or explanations.
 `;
 
-            const result = await model.generateContent({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: { 
-                    responseMimeType: "application/json",
-                    temperature: 0.1
+            const completion = await client.chat.completions.create({
+                model: OPENROUTER_MODEL,
+                messages: [
+                    { role: "system", content: "You are a financial extraction engine. Always output pure, valid JSON only." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.1,
+                extra_body: {
+                    models: OPENROUTER_FALLBACKS
                 }
             });
 
-            const response = await result.response;
-            const responseText = response.text();
-            const parsedData = extractAndParseJson(responseText);
+            const rawContent = completion.choices[0]?.message?.content || "";
+            const parsedData = extractAndParseJson(rawContent);
 
             return res.status(200).json({ result: parsedData });
         }
@@ -168,17 +188,23 @@ Rules & Extraction Guidelines:
             1. Detect the language of the "User Input".
             2. Respond in the SAME language as the input.
             3. For ADD, default to "expense" if unclear.
-            4. Output STRICTLY valid JSON.
+            4. Output STRICTLY valid JSON only.
             `;
 
-            const result = await model.generateContent({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
+            const completion = await client.chat.completions.create({
+                model: OPENROUTER_MODEL,
+                messages: [
+                    { role: "system", content: "You are a smart financial assistant. Always respond with pure valid JSON only." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.2,
+                extra_body: {
+                    models: OPENROUTER_FALLBACKS
+                }
             });
 
-            const response = await result.response;
-            const responseText = response.text();
-            const parsedData = extractAndParseJson(responseText);
+            const rawContent = completion.choices[0]?.message?.content || "";
+            const parsedData = extractAndParseJson(rawContent);
 
             return res.status(200).json({ result: parsedData });
         }
@@ -219,14 +245,20 @@ Rules & Extraction Guidelines:
             ]
             `;
 
-            const result = await model.generateContent({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
+            const completion = await client.chat.completions.create({
+                model: OPENROUTER_MODEL,
+                messages: [
+                    { role: "system", content: "You are a cash flow forecasting assistant. Output only a strict JSON array of objects." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.2,
+                extra_body: {
+                    models: OPENROUTER_FALLBACKS
+                }
             });
 
-            const response = await result.response;
-            const responseText = response.text();
-            const data = extractAndParseJson(responseText);
+            const rawContent = completion.choices[0]?.message?.content || "[]";
+            const data = extractAndParseJson(rawContent);
 
             return res.status(200).json({ result: Array.isArray(data) ? data : [] });
         }
@@ -252,14 +284,20 @@ Rules & Extraction Guidelines:
             { "category": "CategoryName" }
             `;
 
-            const result = await model.generateContent({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
+            const completion = await client.chat.completions.create({
+                model: OPENROUTER_MODEL,
+                messages: [
+                    { role: "system", content: "You are a category matching assistant. Output only valid JSON." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.1,
+                extra_body: {
+                    models: OPENROUTER_FALLBACKS
+                }
             });
 
-            const response = await result.response;
-            const responseText = response.text();
-            const data = extractAndParseJson(responseText);
+            const rawContent = completion.choices[0]?.message?.content || "{}";
+            const data = extractAndParseJson(rawContent);
 
             return res.status(200).json({ result: data?.category || null });
         }
@@ -267,7 +305,7 @@ Rules & Extraction Guidelines:
         return res.status(400).json({ error: `Unknown action: ${action}` });
 
     } catch (error) {
-        console.error(`Gemini Server Function Error (${action}):`, error);
+        console.error(`OpenRouter Server Function Error (${action}):`, error);
         return res.status(500).json({ error: error.message || 'Internal AI Error' });
     }
 }

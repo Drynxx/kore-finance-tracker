@@ -269,7 +269,7 @@ export const QuickLogHandler = () => {
 
                             <div className="flex items-center gap-1.5 text-xs text-indigo-300/80 font-medium">
                                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                                <span>Powered by Gemini 3.6 Flash</span>
+                                <span>Powered by OpenRouter AI (Nemotron)</span>
                             </div>
                         </motion.div>
                     )}
