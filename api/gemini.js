@@ -31,11 +31,12 @@ const extractAndParseJson = (text) => {
     }
 };
 
-const OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
-const OPENROUTER_FALLBACKS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "openai/gpt-oss-120b:free",
-    "google/gemma-4-26b-it:free"
+// Ultra-fast lightweight models (< 1-2s response time)
+const FAST_MODEL = "google/gemma-4-26b-a4b-it:free";
+const FAST_FALLBACKS = [
+    "google/gemma-4-31b-it:free",
+    "openai/gpt-oss-20b:free",
+    "openrouter/free"
 ];
 
 export default async function handler(req, res) {
@@ -66,19 +67,73 @@ export default async function handler(req, res) {
             }
         });
 
+        // 1. STREAMING CHAT (Instant word-by-word streaming for chat interface)
+        if (action === 'streamChat') {
+            const { text, history = [] } = payload || {};
+            if (!text) {
+                return res.status(400).json({ error: 'Missing text in payload.' });
+            }
+
+            const recentHistory = history.slice(0, 30).map(t => ({
+                date: t.date,
+                amount: t.amount,
+                category: t.category,
+                note: t.note,
+                type: t.type
+            }));
+
+            const systemPrompt = `You are Kore AI, an ultra-fast, intelligent personal finance assistant.
+Today's Date: ${new Date().toISOString().split('T')[0]}
+User's Recent Financial Activity: ${JSON.stringify(recentHistory)}
+
+Rules:
+1. Detect user's language (Romanian or English) and reply concisely in the same language.
+2. Be helpful, direct, and conversational. Give clear monetary calculations if asked.
+3. Keep responses under 2-3 short paragraphs for fast delivery.`;
+
+            // Set SSE Streaming Headers
+            res.writeHead(200, {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive'
+            });
+
+            const stream = await client.chat.completions.create({
+                model: FAST_MODEL,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: text }
+                ],
+                temperature: 0.3,
+                stream: true,
+                extra_body: {
+                    models: FAST_FALLBACKS
+                }
+            });
+
+            for await (const chunk of stream) {
+                const token = chunk.choices[0]?.delta?.content || "";
+                if (token) {
+                    res.write(`data: ${JSON.stringify({ token })}\n\n`);
+                }
+            }
+
+            res.write('data: [DONE]\n\n');
+            return res.end();
+        }
+
+        // 2. QUICK VOICE SHORTCUT (Blazing-fast JSON extraction)
         if (action === 'parseVoiceShortcut') {
             const { text } = payload || {};
             if (!text || !text.trim()) {
                 return res.status(400).json({ error: 'Missing text in payload.' });
             }
 
-            const prompt = `You are a specialized financial transaction extractor for the Kore Finance app.
-Given spoken or typed transaction text from an OS voice shortcut, extract structured transaction data.
-
+            const prompt = `Extract transaction details into strict JSON:
 Current Date: ${new Date().toISOString().split('T')[0]}
-User Voice Input: "${text}"
+User Input: "${text}"
 
-Output a STRICT JSON object matching this schema:
+Schema:
 {
   "amount": number,
   "currency": string,
@@ -88,34 +143,24 @@ Output a STRICT JSON object matching this schema:
   "merchant": string
 }
 
-Rules & Extraction Guidelines:
-1. amount: strictly a positive number (float or integer, e.g. 15 or 42.50). Never negative.
-2. currency: currency code (e.g. "RON", "EUR", "USD", "GBP"). Map "lei", "leu", "ron" to "RON". Map "$", "dollar", "bucks" to "USD". Map "€", "euro" to "EUR". Default to "RON" if none detected.
-3. category: must be one of ["Food", "Rent", "Salary", "Freelance", "Transport", "Entertainment", "Shopping", "Utilities", "Other"].
-   - Food: groceries, restaurants, dining, coffee, snacks, supermarket (Mega Image, Lidl, Kaufland, Carrefour, Glovo, Tazz, Starbucks, etc.)
-   - Transport: Uber, Bolt, taxi, fuel/gas, metro, bus, parking, airline, train
-   - Shopping: retail, electronics, clothing, Amazon, eMAG, Zara, etc.
-   - Entertainment: movies, games, Steam, cinema, concert, bar, pub, club
-   - Utilities: electricity, water, internet, phone bill, Enel, Digi, Orange, Vodafone
-   - Rent: rent, chirie
-   - Salary: wage, salary, salariu, paycheck
-   - Freelance: invoice, client payment, project
-   - Other: unspecified or other
-4. paymentMethod: "Card" if a digital service, online platform, ride-hailing (Uber, Bolt), delivery app (Glovo, Tazz, DoorDash), subscription (Netflix, Spotify, Apple, Google, Amazon), or card payment is mentioned. Default to "Cash" if cash is mentioned or payment method is unspecified.
-5. type: "income" for salary, received money, freelance payment, refunds. Default to "expense".
-6. merchant: clean brand, vendor, or store name if identified (e.g. "Starbucks", "Uber", "Lidl", "Mega Image"), or empty string "" if none mentioned.
-7. Return ONLY the raw JSON object. No Markdown fences or explanations.
-`;
+Rules:
+1. amount: strictly positive number (e.g. 15 or 45.5).
+2. currency: "RON" (default), "EUR", "USD", "GBP". Map "lei"/"leu" -> "RON".
+3. category: select best fit from schema.
+4. paymentMethod: "Card" if digital/taxi/delivery/card mentioned; default "Cash".
+5. type: "income" for salary/received money; default "expense".
+6. merchant: clean store/vendor name or "".
+7. Output pure raw JSON only.`;
 
             const completion = await client.chat.completions.create({
-                model: OPENROUTER_MODEL,
+                model: FAST_MODEL,
                 messages: [
-                    { role: "system", content: "You are a financial extraction engine. Always output pure, valid JSON only." },
+                    { role: "system", content: "You are a fast JSON financial extraction engine. Output only valid JSON." },
                     { role: "user", content: prompt }
                 ],
                 temperature: 0.1,
                 extra_body: {
-                    models: OPENROUTER_FALLBACKS
+                    models: FAST_FALLBACKS
                 }
             });
 
@@ -125,13 +170,14 @@ Rules & Extraction Guidelines:
             return res.status(200).json({ result: parsedData });
         }
 
+        // 3. PARSE TRANSACTION & INTENT DETECTION
         if (action === 'parseTransaction') {
             const { text, history = [] } = payload || {};
             if (!text) {
                 return res.status(400).json({ error: 'Missing text in payload.' });
             }
 
-            const recentHistory = history.slice(0, 50).map(t => ({
+            const recentHistory = history.slice(0, 40).map(t => ({
                 date: t.date,
                 amount: t.amount,
                 category: t.category,
@@ -144,62 +190,54 @@ Rules & Extraction Guidelines:
             Transaction History: ${JSON.stringify(recentHistory)}
             User Input: "${text}"
 
-            You are a smart financial assistant. Analyze the User Input and determine the INTENT.
-            The user may speak in English or Romanian.
-            If the input is in Romanian, the "conversational_response" MUST be in Romanian.
-            If the input is in English, the "conversational_response" MUST be in English.
+            Analyze User Input and determine INTENT.
+            If input is in Romanian, "conversational_response" MUST be in Romanian.
+            If input is in English, "conversational_response" MUST be in English.
 
             ---
             INTENT 1: ADD_TRANSACTION
-            Trigger: User wants to log an expense or income (e.g., "Spent 50 on pizza", "Salary came in", "Am cheltuit 50 lei pe pizza", "A intrat salariul").
+            Trigger: User logs expense/income (e.g. "Spent 50 on pizza", "Am cheltuit 50 lei pe pizza").
             Output JSON:
             {
                 "intent": "add",
                 "type": "expense" | "income",
                 "amount": number,
                 "category": "Food" | "Rent" | "Salary" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Other",
-                "note": "short description (keep original language)",
+                "note": "short description",
                 "date": "YYYY-MM-DD",
-                "conversational_response": "Added 50 lei for pizza. / Am adăugat 50 lei pentru pizza."
+                "conversational_response": "Added 50 lei for pizza."
             }
 
             ---
             INTENT 2: QUERY
-            Trigger: User asks a question about their finances (e.g., "How much did I spend on food?", "Cat am cheltuit pe mancare?").
-            Action: Analyze the "Transaction History" provided above to answer the question accurately.
+            Trigger: User asks about their finances.
             Output JSON:
             {
                 "intent": "query",
-                "conversational_response": "You spent a total of 450 lei on Food. / Ai cheltuit un total de 450 lei pe Mâncare."
+                "conversational_response": "Answer based on history."
             }
 
             ---
             INTENT 3: FORECAST
-            Trigger: User asks about future spending or prediction (e.g., "How much will I spend next month?", "Cat crezi ca o sa cheltui luna viitoare?", "spending forecast").
-            Action: Analyze the "Transaction History" (recurrence, average spending) to Estimate the total for the requested period.
+            Trigger: User asks about future spending prediction.
             Output JSON:
             {
                 "intent": "forecast",
-                "conversational_response": "Based on your spending habits, I predict you will spend around 2500 lei next month. / Bazat pe istoricul tău, preconizez că vei cheltui aproximativ 2500 lei luna viitoare."
+                "conversational_response": "Prediction based on history."
             }
 
-            ---
-            Rules:
-            1. Detect the language of the "User Input".
-            2. Respond in the SAME language as the input.
-            3. For ADD, default to "expense" if unclear.
-            4. Output STRICTLY valid JSON only.
+            Rules: Output pure valid JSON only.
             `;
 
             const completion = await client.chat.completions.create({
-                model: OPENROUTER_MODEL,
+                model: FAST_MODEL,
                 messages: [
-                    { role: "system", content: "You are a smart financial assistant. Always respond with pure valid JSON only." },
+                    { role: "system", content: "You are a financial AI assistant. Output strictly valid JSON." },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.2,
+                temperature: 0.1,
                 extra_body: {
-                    models: OPENROUTER_FALLBACKS
+                    models: FAST_FALLBACKS
                 }
             });
 
@@ -209,6 +247,7 @@ Rules & Extraction Guidelines:
             return res.status(200).json({ result: parsedData });
         }
 
+        // 4. GENERATE FORECAST
         if (action === 'generateForecast') {
             const { transactions = [], currentBalance = 0 } = payload || {};
 
@@ -228,32 +267,24 @@ Rules & Extraction Guidelines:
             const prompt = `
             Current Date: ${today.toISOString().split('T')[0]}
             Current Balance: ${currentBalance}
-            Transaction History (Last 90 Days): ${JSON.stringify(history)}
+            Recent History: ${JSON.stringify(history.slice(-30))}
 
-            GOAL: Forecast the daily balance for the NEXT 30 DAYS.
-
-            INSTRUCTIONS:
-            1. Analyze the history to identify RECURRING bills/income (e.g., Rent, Salary, Subscriptions) based on amount and day of month.
-            2. Estimate average daily VARIABLE spending (Food, Transport, etc.).
-            3. Generate a daily forecast starting from tomorrow.
-            4. For each day, calculate the projected balance.
-
-            OUTPUT FORMAT:
-            Return a STRICT JSON array of objects:
+            Forecast daily balance for NEXT 30 DAYS based on recurring bills and average spending.
+            Return STRICT JSON array:
             [
                 { "date": "YYYY-MM-DD", "balance": number, "reason": "Salary" | "Rent" | "Estimated Spending" | null }
             ]
             `;
 
             const completion = await client.chat.completions.create({
-                model: OPENROUTER_MODEL,
+                model: FAST_MODEL,
                 messages: [
-                    { role: "system", content: "You are a cash flow forecasting assistant. Output only a strict JSON array of objects." },
+                    { role: "system", content: "You are a cash flow forecasting assistant. Output only a strict JSON array." },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.2,
+                temperature: 0.1,
                 extra_body: {
-                    models: OPENROUTER_FALLBACKS
+                    models: FAST_FALLBACKS
                 }
             });
 
@@ -263,6 +294,7 @@ Rules & Extraction Guidelines:
             return res.status(200).json({ result: Array.isArray(data) ? data : [] });
         }
 
+        // 5. SUGGEST CATEGORY
         if (action === 'suggestCategory') {
             const { note = '', existingCategories = [] } = payload || {};
 
@@ -271,28 +303,20 @@ Rules & Extraction Guidelines:
             }
 
             const prompt = `
-            You are a categorization assistant. 
-            Analyze the transaction note: "${note}".
-            Map it to one of these existing categories: ${JSON.stringify(existingCategories)}.
-            
-            Rules:
-            1. If it clearly fits an existing category, return that category.
-            2. If it does not fit, suggest a NEW, short, generic category name (One word, Capitalized, English).
-            3. Be smart about cultural context (e.g., "Mega Image" is Food/Groceries).
-
-            Output STRICT JSON:
-            { "category": "CategoryName" }
+            Map transaction note "${note}" to one of these categories: ${JSON.stringify(existingCategories)}.
+            If none match, return a clean 1-word English category.
+            Output JSON: { "category": "CategoryName" }
             `;
 
             const completion = await client.chat.completions.create({
-                model: OPENROUTER_MODEL,
+                model: FAST_MODEL,
                 messages: [
                     { role: "system", content: "You are a category matching assistant. Output only valid JSON." },
                     { role: "user", content: prompt }
                 ],
                 temperature: 0.1,
                 extra_body: {
-                    models: OPENROUTER_FALLBACKS
+                    models: FAST_FALLBACKS
                 }
             });
 
@@ -305,7 +329,7 @@ Rules & Extraction Guidelines:
         return res.status(400).json({ error: `Unknown action: ${action}` });
 
     } catch (error) {
-        console.error(`OpenRouter Server Function Error (${action}):`, error);
+        console.error(`AI Server Function Error (${action}):`, error);
         return res.status(500).json({ error: error.message || 'Internal AI Error' });
     }
 }
