@@ -14,6 +14,7 @@ import { WallpaperProvider } from './context/WallpaperContext';
 import { VerificationPending } from './components/VerificationPending';
 
 import { ResetPassword } from './components/ResetPassword';
+import { QuickLogHandler } from './components/QuickLogHandler';
 
 // Wrapper component to handle auth state
 const AppContent = () => {
@@ -22,6 +23,13 @@ const AppContent = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [resetParams, setResetParams] = useState(null);
+
+  // Check if current route is the Native OS Voice Shortcut / Web Share Target / Protocol handler
+  const searchParams = new URLSearchParams(window.location.search);
+  const isQuickLog = 
+    window.location.pathname.startsWith('/quick-log') ||
+    searchParams.has('quickLog') ||
+    (searchParams.has('text') && !searchParams.has('userId'));
 
   // Handle Verification & Password Reset Callbacks
   React.useEffect(() => {
@@ -57,6 +65,16 @@ const AppContent = () => {
           window.history.replaceState({}, document.title, window.location.pathname);
         }}
       />
+    );
+  }
+
+  // Quick Log Ingestion Handler (Lightweight, No Full Dashboard loaded)
+  if (isQuickLog) {
+    return (
+      <WallpaperProvider>
+        <NatureBackground />
+        <QuickLogHandler />
+      </WallpaperProvider>
     );
   }
 

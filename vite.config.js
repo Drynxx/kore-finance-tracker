@@ -34,6 +34,24 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'any maskable'
           }
+        ],
+        start_url: '/',
+        scope: '/',
+        share_target: {
+          action: '/quick-log',
+          method: 'GET',
+          enctype: 'application/x-www-form-urlencoded',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url'
+          }
+        },
+        protocol_handlers: [
+          {
+            protocol: 'web+kore',
+            url: '/quick-log?text=%s'
+          }
         ]
       }
     })

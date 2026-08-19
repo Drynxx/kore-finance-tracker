@@ -30,6 +30,15 @@ export const parseTransactionWithGemini = async (text, history = []) => {
     }
 };
 
+export const parseVoiceShortcut = async (text) => {
+    try {
+        return await callGeminiProxy('parseVoiceShortcut', { text });
+    } catch (error) {
+        console.error("Gemini Voice Shortcut Error:", error);
+        throw new Error(`AI Voice Parsing Error: ${error.message || "Unknown error"}`);
+    }
+};
+
 export const generateCashFlowForecast = async (transactions, currentBalance) => {
     try {
         const data = await callGeminiProxy('generateForecast', { transactions, currentBalance });
