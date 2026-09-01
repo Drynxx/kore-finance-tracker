@@ -114,11 +114,11 @@ export const generateStatisticalForecast = (transactions = [], currentBalance = 
 /**
  * Local regex & keyword-based voice shortcut parser
  */
-export const parseLocalVoiceShortcut = (text = '') => {
+export const parseLocalVoiceShortcut = (text = '', history = []) => {
     const clean = text.toLowerCase().trim();
     
     // Extract amount: e.g. "50 lei", "15.5 ron", "20 eur", "spent 100"
-    const amountMatch = clean.match(/(?:spent|cheltuit|platit|am dat|cumparat|bought|paid)?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:lei|ron|eur|usd|gbp|\$|€|£)?/i) ||
+    const amountMatch = clean.match(/(?:spent|cheltuit|platit|am dat|cumparat|bought|paid|am bagat)?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:lei|ron|eur|usd|gbp|\$|€|£)?/i) ||
                         clean.match(/(\d+(?:[.,]\d{1,2})?)/);
     
     const amount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.')) : 0;
@@ -129,15 +129,42 @@ export const parseLocalVoiceShortcut = (text = '') => {
     if (clean.includes('gbp') || clean.includes('lire') || clean.includes('£')) currency = 'GBP';
 
     let category = 'Other';
-    if (/(cafea|coffee|mancare|food|pizza|burger|lidl|kaufland|mega|restaurant|pranz|cina|mic dejun|shaorma)/i.test(clean)) category = 'Food';
-    else if (/(uber|bolt|taxi|benzina|gaz|diesel|motorina|transport|bus|metrou|tren)/i.test(clean)) category = 'Transport';
-    else if (/(chirie|rent|curent|gaz|intretinere|enel|digi|vodafone|orange|utilitati|lumina)/i.test(clean)) category = 'Utilities';
-    else if (/(haine|shoes|adidasi|mall|zara|hm|shopping|cumparaturi|emag|altex)/i.test(clean)) category = 'Shopping';
-    else if (/(cinema|film|netflix|spotify|party|bere|club|joc|game|distractie)/i.test(clean)) category = 'Entertainment';
-    else if (/(salariu|salary|venit|avans|bonus|incasat|primit bani)/i.test(clean)) category = 'Salary';
+    if (/(cafea|coffee|mancare|food|pizza|burger|lidl|kaufland|mega|restaurant|pranz|cina|mic dejun|shaorma|profi|carrefour|auchan|paine|lapte|sandwich|croissant|covrig)/i.test(clean)) category = 'Food';
+    else if (/(uber|bolt|taxi|benzina|gaz|diesel|motorina|transport|bus|metrou|tren|omv|petrom|mol|rompetrol|bilet)/i.test(clean)) category = 'Transport';
+    else if (/(chirie|rent|curent|gaz|intretinere|enel|digi|vodafone|orange|utilitati|lumina|eon|hidroelectrica|factura)/i.test(clean)) category = 'Utilities';
+    else if (/(haine|shoes|adidasi|mall|zara|hm|shopping|cumparaturi|emag|altex|flanco|fashion|tricou|pantaloni)/i.test(clean)) category = 'Shopping';
+    else if (/(cinema|film|netflix|spotify|party|bere|club|joc|game|distractie|biliard|bowling|iesire)/i.test(clean)) category = 'Entertainment';
+    else if (/(salariu|salary|venit|avans|bonus|incasat|primit bani|transfer primit|diurna)/i.test(clean)) category = 'Salary';
 
     const type = (clean.includes('salariu') || clean.includes('venit') || clean.includes('primit') || clean.includes('income')) ? 'income' : 'expense';
     const paymentMethod = (clean.includes('card') || clean.includes('pos') || clean.includes('apple pay') || clean.includes('google pay')) ? 'Card' : 'Cash';
+
+    let merchant = text
+        .replace(/(\d+(?:[.,]\d{1,2})?)/g, '')
+        .replace(/\b(lei|ron|eur|euro|usd|am|dat|cheltuit|pe|la|pentru|in|spent|for|on|bought|paid|o|un|de|cu|din)\b/gi, '')
+        .replace(/[^\w\s\u00C0-\u024F]/gi, '')
+        .trim();
+
+    if (!merchant) merchant = category;
+
+    // Conversational query answers when no amount was given
+    let conversational_response = `Am înregistrat ${amount} ${currency} pentru ${category} (${merchant}).`;
+
+    if (amount === 0) {
+        if (/(salut|buna|hello|hi|hei)/i.test(clean)) {
+            conversational_response = "Salut! Cu ce te pot ajuta? Poți să-mi spui o cheltuială (ex: 'Cafea 15 lei') sau să mă întrebi despre soldul tău.";
+        } else if (/(cati bani|sold|balanta|ce am|disponibil)/i.test(clean)) {
+            const balance = history.reduce((sum, t) => sum + (t.type === 'income' || t.amount > 0 ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
+            conversational_response = `Soldul tău curent este de ${Math.round(balance * 100) / 100} RON.`;
+        } else if (/(cat am cheltuit|cheltuieli|total)/i.test(clean)) {
+            const expenses = history
+                .filter(t => t.type === 'expense' || t.amount < 0)
+                .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            conversational_response = `Ai cheltuit un total de ${Math.round(expenses * 100) / 100} RON conform istoricului tău.`;
+        } else {
+            conversational_response = "Tranzacțiile și datele tale financiare sunt actualizate.";
+        }
+    }
 
     return {
         amount,
@@ -145,7 +172,8 @@ export const parseLocalVoiceShortcut = (text = '') => {
         category,
         paymentMethod,
         type,
-        merchant: clean.replace(/\d+/g, '').replace(/lei|ron|eur|pe|la|in|for/g, '').trim().slice(0, 30)
+        merchant,
+        conversational_response
     };
 };
 
@@ -218,7 +246,8 @@ export const streamChatFromAI = async (text, history = [], onChunk, onComplete) 
         // Handled below
     }
 
-    const fallbackText = "Tranzacțiile tale sunt sincronizate și în siguranță.";
+    const local = parseLocalVoiceShortcut(text, history);
+    const fallbackText = local.conversational_response || "Tranzacțiile tale sunt sincronizate și în siguranță.";
     if (onChunk) onChunk(fallbackText, fallbackText);
     if (onComplete) onComplete(fallbackText);
     return fallbackText;
@@ -234,7 +263,7 @@ export const parseTransactionWithGemini = async (text, history = []) => {
         // Handled below
     }
 
-    const local = parseLocalVoiceShortcut(text);
+    const local = parseLocalVoiceShortcut(text, history);
     return {
         intent: local.amount > 0 ? "add" : "query",
         type: local.type,
@@ -242,9 +271,7 @@ export const parseTransactionWithGemini = async (text, history = []) => {
         category: local.category,
         note: local.merchant || text,
         date: new Date().toISOString().split('T')[0],
-        conversational_response: local.amount > 0 
-            ? `Am înregistrat ${local.amount} ${local.currency} pentru ${local.category}.`
-            : `Soldul tău este actualizat.`
+        conversational_response: local.conversational_response
     };
 };
 

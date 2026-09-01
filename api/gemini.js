@@ -33,13 +33,13 @@ const extractAndParseJson = (text) => {
 
 // ----------------------------------------------------
 // LOCAL DETERMINISTIC NLP & STATISTICAL ENGINES
-// (Executed whenever OpenRouter encounters rate limits / 429)
+// (Executed only if all OpenRouter endpoints fail)
 // ----------------------------------------------------
 
-const fallbackParseTransaction = (text = '') => {
+const fallbackParseTransaction = (text = '', history = []) => {
     const clean = text.toLowerCase().trim();
 
-    // Extract amount: e.g. "50 lei", "15.5 ron", "20 eur", "spent 100", "am dat 35"
+    // 1. Number extraction (supports Romanian comma decimal like 12,50 or 12.50 or plain 15)
     const amountMatch = clean.match(/(?:spent|cheltuit|platit|am dat|cumparat|bought|paid|am bagat)?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:lei|ron|eur|usd|gbp|\$|€|£)?/i) ||
                         clean.match(/(\d+(?:[.,]\d{1,2})?)/);
 
@@ -51,22 +51,44 @@ const fallbackParseTransaction = (text = '') => {
     if (clean.includes('gbp') || clean.includes('lire') || clean.includes('£')) currency = 'GBP';
 
     let category = 'Other';
-    if (/(cafea|coffee|mancare|food|pizza|burger|lidl|kaufland|mega|restaurant|pranz|cina|mic dejun|shaorma|profi|carrefour|auchan)/i.test(clean)) category = 'Food';
-    else if (/(uber|bolt|taxi|benzina|gaz|diesel|motorina|transport|bus|metrou|tren|omv|petrom|mol|rompetrol)/i.test(clean)) category = 'Transport';
-    else if (/(chirie|rent|curent|gaz|intretinere|enel|digi|vodafone|orange|utilitati|lumina|eon|hidroelectrica)/i.test(clean)) category = 'Utilities';
-    else if (/(haine|shoes|adidasi|mall|zara|hm|shopping|cumparaturi|emag|altex|flanco|fashion)/i.test(clean)) category = 'Shopping';
-    else if (/(cinema|film|netflix|spotify|party|bere|club|joc|game|distractie|biliard|bowling)/i.test(clean)) category = 'Entertainment';
-    else if (/(salariu|salary|venit|avans|bonus|incasat|primit bani|transfer primit)/i.test(clean)) category = 'Salary';
+    if (/(cafea|coffee|mancare|food|pizza|burger|lidl|kaufland|mega|restaurant|pranz|cina|mic dejun|shaorma|profi|carrefour|auchan|paine|lapte|sandwich|croissant|covrig)/i.test(clean)) category = 'Food';
+    else if (/(uber|bolt|taxi|benzina|gaz|diesel|motorina|transport|bus|metrou|tren|omv|petrom|mol|rompetrol|bilet)/i.test(clean)) category = 'Transport';
+    else if (/(chirie|rent|curent|gaz|intretinere|enel|digi|vodafone|orange|utilitati|lumina|eon|hidroelectrica|factura)/i.test(clean)) category = 'Utilities';
+    else if (/(haine|shoes|adidasi|mall|zara|hm|shopping|cumparaturi|emag|altex|flanco|fashion|tricou|pantaloni)/i.test(clean)) category = 'Shopping';
+    else if (/(cinema|film|netflix|spotify|party|bere|club|joc|game|distractie|biliard|bowling|iesire)/i.test(clean)) category = 'Entertainment';
+    else if (/(salariu|salary|venit|avans|bonus|incasat|primit bani|transfer primit|diurna)/i.test(clean)) category = 'Salary';
 
-    const isIncome = /(salariu|salary|venit|avans|bonus|incasat|primit bani|transfer primit|income)/i.test(clean);
+    const isIncome = /(salariu|salary|venit|avans|bonus|incasat|primit bani|transfer primit|diurna|income)/i.test(clean);
     const type = isIncome ? 'income' : 'expense';
     const paymentMethod = /(card|pos|apple pay|google pay|online|revolut)/i.test(clean) ? 'Card' : 'Cash';
 
-    // Clean note / merchant name
-    const merchant = text
-        .replace(/\b(\d+(?:[.,]\d{1,2})?)\b/g, '')
-        .replace(/\b(lei|ron|eur|euro|usd|am|dat|cheltuit|pe|la|pentru|in|spent|for|on|bought|paid)\b/gi, '')
+    // Note extraction
+    let merchant = text
+        .replace(/(\d+(?:[.,]\d{1,2})?)/g, '')
+        .replace(/\b(lei|ron|eur|euro|usd|am|dat|cheltuit|pe|la|pentru|in|spent|for|on|bought|paid|o|un|de|cu|din)\b/gi, '')
+        .replace(/[^\w\s\u00C0-\u024F]/gi, '')
         .trim();
+
+    if (!merchant) merchant = category;
+
+    // Conversational query answers when no amount was given
+    let conversational_response = `Am înregistrat ${amount} ${currency} pentru ${category} (${merchant}).`;
+
+    if (amount === 0) {
+        if (/(salut|buna|hello|hi|hei)/i.test(clean)) {
+            conversational_response = "Salut! Cu ce te pot ajuta? Poți să-mi spui o cheltuială (ex: 'Cafea 15 lei') sau să mă întrebi despre soldul tău.";
+        } else if (/(cati bani|sold|balanta|ce am|disponibil)/i.test(clean)) {
+            const balance = history.reduce((sum, t) => sum + (t.type === 'income' || t.amount > 0 ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
+            conversational_response = `Soldul tău curent este de ${Math.round(balance * 100) / 100} RON.`;
+        } else if (/(cat am cheltuit|cheltuieli|total)/i.test(clean)) {
+            const expenses = history
+                .filter(t => t.type === 'expense' || t.amount < 0)
+                .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            conversational_response = `Ai cheltuit un total de ${Math.round(expenses * 100) / 100} RON conform istoricului tău.`;
+        } else {
+            conversational_response = "Tranzacțiile și datele tale financiare sunt actualizate.";
+        }
+    }
 
     return {
         amount,
@@ -74,7 +96,8 @@ const fallbackParseTransaction = (text = '') => {
         category,
         paymentMethod,
         type,
-        merchant: merchant || category
+        merchant,
+        conversational_response
     };
 };
 
@@ -83,7 +106,9 @@ const fallbackGenerateForecast = (transactions = [], currentBalance = 0) => {
     const ninetyDaysAgo = new Date(today);
     ninetyDaysAgo.setDate(today.getDate() - 90);
 
-    const recentTx = transactions.filter(t => new Date(t.date) >= ninetyDaysAgo);
+    const recentTx = Array.isArray(transactions) 
+        ? transactions.filter(t => new Date(t.date) >= ninetyDaysAgo)
+        : [];
 
     let totalExpenses = 0;
     let totalIncome = 0;
@@ -122,12 +147,11 @@ const fallbackGenerateForecast = (transactions = [], currentBalance = 0) => {
     return forecast;
 };
 
-// Ultra-fast lightweight models (< 1-2s response time)
-const FAST_MODEL = "google/gemma-4-26b-a4b-it:free";
-const FAST_FALLBACKS = [
+// OpenRouter auto-router with fast, live fallback models
+const PRIMARY_MODEL = "openrouter/free";
+const FALLBACK_MODELS = [
     "google/gemma-4-31b-it:free",
-    "openai/gpt-oss-20b:free",
-    "openrouter/free"
+    "liquid/lfm-2.5-2.6b:free"
 ];
 
 export default async function handler(req, res) {
@@ -143,7 +167,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing action parameter.' });
     }
 
-    // If API key is missing or invalid, serve gracefully via local NLP engine
     if (!apiKey) {
         console.warn("OPENROUTER_API_KEY not set. Serving via local NLP engine.");
         return handleFallbackResponse(action, payload, res);
@@ -192,7 +215,7 @@ Rules:
 
             try {
                 const stream = await client.chat.completions.create({
-                    model: FAST_MODEL,
+                    model: PRIMARY_MODEL,
                     messages: [
                         { role: "system", content: systemPrompt },
                         { role: "user", content: text }
@@ -200,7 +223,7 @@ Rules:
                     temperature: 0.3,
                     stream: true,
                     extra_body: {
-                        models: FAST_FALLBACKS
+                        models: FALLBACK_MODELS
                     }
                 });
 
@@ -211,7 +234,7 @@ Rules:
                     }
                 }
             } catch (streamErr) {
-                console.warn("OpenRouter stream hit error/429, streaming local response:", streamErr.message);
+                console.warn("OpenRouter stream hit error, streaming local response:", streamErr.message);
                 const localMsg = "Tranzacțiile tale sunt sincronizate și în siguranță.";
                 res.write(`data: ${JSON.stringify({ token: localMsg })}\n\n`);
             }
@@ -252,14 +275,14 @@ Rules:
 7. Output pure raw JSON only.`;
 
                 const completion = await client.chat.completions.create({
-                    model: FAST_MODEL,
+                    model: PRIMARY_MODEL,
                     messages: [
                         { role: "system", content: "You are a fast JSON financial extraction engine. Output only valid JSON." },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0.1,
                     extra_body: {
-                        models: FAST_FALLBACKS
+                        models: FALLBACK_MODELS
                     }
                 });
 
@@ -268,7 +291,7 @@ Rules:
 
                 return res.status(200).json({ result: parsedData });
             } catch (err) {
-                console.warn("OpenRouter parseVoiceShortcut error/429, using local NLP:", err.message);
+                console.warn("OpenRouter parseVoiceShortcut error, using local NLP:", err.message);
                 const localData = fallbackParseTransaction(text);
                 return res.status(200).json({ result: localData, fallback: true });
             }
@@ -301,7 +324,7 @@ Rules:
 
                 ---
                 INTENT 1: ADD_TRANSACTION
-                Trigger: User logs expense/income (e.g. "Spent 50 on pizza", "Am cheltuit 50 lei pe pizza").
+                Trigger: User logs expense/income (e.g. "Spent 50 on pizza", "Am cheltuit 50 lei pe pizza", "Cafea 15 lei").
                 Output JSON:
                 {
                     "intent": "add",
@@ -310,12 +333,12 @@ Rules:
                     "category": "Food" | "Rent" | "Salary" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Other",
                     "note": "short description",
                     "date": "YYYY-MM-DD",
-                    "conversational_response": "Added 50 lei for pizza."
+                    "conversational_response": "Am adăugat 50 lei pentru pizza."
                 }
 
                 ---
                 INTENT 2: QUERY
-                Trigger: User asks about their finances.
+                Trigger: User asks about their finances or greets.
                 Output JSON:
                 {
                     "intent": "query",
@@ -335,14 +358,14 @@ Rules:
                 `;
 
                 const completion = await client.chat.completions.create({
-                    model: FAST_MODEL,
+                    model: PRIMARY_MODEL,
                     messages: [
                         { role: "system", content: "You are a financial AI assistant. Output strictly valid JSON." },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0.1,
                     extra_body: {
-                        models: FAST_FALLBACKS
+                        models: FALLBACK_MODELS
                     }
                 });
 
@@ -351,8 +374,8 @@ Rules:
 
                 return res.status(200).json({ result: parsedData });
             } catch (err) {
-                console.warn("OpenRouter parseTransaction error/429, using local NLP:", err.message);
-                const local = fallbackParseTransaction(text);
+                console.warn("OpenRouter parseTransaction error, using local NLP:", err.message);
+                const local = fallbackParseTransaction(text, history);
                 const isAdd = local.amount > 0;
                 return res.status(200).json({
                     result: {
@@ -362,9 +385,7 @@ Rules:
                         category: local.category,
                         note: local.merchant || text,
                         date: new Date().toISOString().split('T')[0],
-                        conversational_response: isAdd
-                            ? `Am înregistrat ${local.amount} ${local.currency} pentru ${local.category}.`
-                            : "Soldul tău și tranzacțiile sunt actualizate."
+                        conversational_response: local.conversational_response
                     },
                     fallback: true
                 });
@@ -402,14 +423,14 @@ Rules:
                 `;
 
                 const completion = await client.chat.completions.create({
-                    model: FAST_MODEL,
+                    model: PRIMARY_MODEL,
                     messages: [
                         { role: "system", content: "You are a cash flow forecasting assistant. Output only a strict JSON array." },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0.1,
                     extra_body: {
-                        models: FAST_FALLBACKS
+                        models: FALLBACK_MODELS
                     }
                 });
 
@@ -421,7 +442,7 @@ Rules:
                 }
                 throw new Error("Insufficient forecast points from model");
             } catch (err) {
-                console.warn("OpenRouter forecast error/429, using statistical forecast:", err.message);
+                console.warn("OpenRouter forecast error, using statistical forecast:", err.message);
                 const localForecast = fallbackGenerateForecast(transactions, currentBalance);
                 return res.status(200).json({ result: localForecast, fallback: true });
             }
@@ -443,14 +464,14 @@ Rules:
                 `;
 
                 const completion = await client.chat.completions.create({
-                    model: FAST_MODEL,
+                    model: PRIMARY_MODEL,
                     messages: [
                         { role: "system", content: "You are a category matching assistant. Output only valid JSON." },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0.1,
                     extra_body: {
-                        models: FAST_FALLBACKS
+                        models: FALLBACK_MODELS
                     }
                 });
 
@@ -459,7 +480,7 @@ Rules:
 
                 return res.status(200).json({ result: data?.category || null });
             } catch (err) {
-                console.warn("OpenRouter suggestCategory error/429, using local matching:", err.message);
+                console.warn("OpenRouter suggestCategory error, using local matching:", err.message);
                 const local = fallbackParseTransaction(note);
                 return res.status(200).json({ result: local.category, fallback: true });
             }
@@ -478,18 +499,17 @@ function handleFallbackResponse(action, payload = {}, res) {
         return res.status(200).json({ result: fallbackParseTransaction(payload.text || '') });
     }
     if (action === 'parseTransaction') {
-        const local = fallbackParseTransaction(payload.text || '');
+        const local = fallbackParseTransaction(payload.text || '', payload.history || []);
+        const isAdd = local.amount > 0;
         return res.status(200).json({
             result: {
-                intent: local.amount > 0 ? "add" : "query",
+                intent: isAdd ? "add" : "query",
                 type: local.type,
                 amount: local.amount,
                 category: local.category,
                 note: local.merchant || payload.text,
                 date: new Date().toISOString().split('T')[0],
-                conversational_response: local.amount > 0 
-                    ? `Am înregistrat ${local.amount} ${local.currency} pentru ${local.category}.`
-                    : "Soldul tău este sincronizat."
+                conversational_response: local.conversational_response
             }
         });
     }
