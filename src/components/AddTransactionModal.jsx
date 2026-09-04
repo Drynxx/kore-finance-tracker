@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { TransactionContext } from '../context/TransactionContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { suggestCategory } from '../services/gemini';
+import { suggestCategory, matchLocalCategory, recordVendorCategory } from '../services/gemini';
 import { X, Check, Calendar, Tag, FileText, ArrowUpCircle, ArrowDownCircle, Loader2, Plus, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { transactionSchema } from '../schemas/transaction';
@@ -34,9 +34,16 @@ const AddTransactionModal = ({ onClose, transactionToEdit = null }) => {
         }
     }, [transactionToEdit]);
 
-    // AI Auto-Match Logic (Debounced Gemini) - Only run if NOT editing initially or if user changes note
+    // AI Auto-Match Logic - Instant Local Dictionary (0ms, 0 Tokens) with Debounced AI Fallback
     useEffect(() => {
         if (!note.trim() || (transactionToEdit && note === transactionToEdit.note)) return;
+
+        // Instant local match (0 tokens, 0 delay)
+        const instant = matchLocalCategory(note, CATEGORIES);
+        if (instant) {
+            setCategory(instant);
+            return;
+        }
 
         const timer = setTimeout(async () => {
             setIsAiThinking(true);
@@ -95,7 +102,13 @@ const AddTransactionModal = ({ onClose, transactionToEdit = null }) => {
                 });
             }
 
+            // Save user categorization preference to local adaptive memory (0 tokens for future entries)
+            if (validatedData.note && validatedData.category) {
+                recordVendorCategory(validatedData.note, validatedData.category);
+            }
+
             // Reset and close
+
             setAmount('');
             setNote('');
             setCategory(''); // Clear category too

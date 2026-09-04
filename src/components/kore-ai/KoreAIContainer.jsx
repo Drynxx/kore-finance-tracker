@@ -134,9 +134,11 @@ export const KoreAIContainer = ({ onClose }) => {
         setInputText('');
 
         try {
-            const result = await parseTransactionWithGemini(text, transactions);
+            const currentBalance = transactions.reduce((sum, t) => sum + (t.type === 'income' || t.amount > 0 ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
+            const result = await parseTransactionWithGemini(text, transactions, currentBalance);
 
             if (result.conversational_response) {
+
                 speak(result.conversational_response);
             }
 

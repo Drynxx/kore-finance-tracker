@@ -151,18 +151,21 @@ const fallbackGenerateForecast = (transactions = [], currentBalance = 0) => {
 // ----------------------------------------------------
 // TIER 1: GOOGLE GEMINI EXECUTION (PRIMARY PRIORITY)
 // ----------------------------------------------------
-const GEMINI_MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
 
-async function callGemini(apiKey, prompt, systemInstruction = null, isJson = true) {
+async function callGemini(apiKey, prompt, systemInstruction = null, isJson = true, maxOutputTokens = 256) {
     const genAI = new GoogleGenerativeAI(apiKey);
     let lastError = null;
 
     for (const modelName of GEMINI_MODELS) {
         try {
             const config = { model: modelName };
+            const genConfig = { maxOutputTokens };
             if (isJson) {
-                config.generationConfig = { responseMimeType: "application/json" };
+                genConfig.responseMimeType = "application/json";
             }
+            config.generationConfig = genConfig;
+
             if (systemInstruction) {
                 config.systemInstruction = systemInstruction;
             }
@@ -200,7 +203,7 @@ const FALLBACK_OPENROUTER_MODELS = [
     "liquid/lfm-2.5-2.6b:free"
 ];
 
-async function callOpenRouter(apiKey, messages) {
+async function callOpenRouter(apiKey, messages, maxTokens = 256) {
     const client = new OpenAI({
         baseURL: "https://openrouter.ai/api/v1",
         apiKey: apiKey,
@@ -214,6 +217,7 @@ async function callOpenRouter(apiKey, messages) {
         model: PRIMARY_OPENROUTER_MODEL,
         messages: messages,
         temperature: 0.1,
+        max_tokens: maxTokens,
         extra_body: {
             models: FALLBACK_OPENROUTER_MODELS
         }
@@ -240,29 +244,25 @@ export default async function handler(req, res) {
     const geminiApiKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "").trim();
     const openrouterApiKey = (process.env.OPENROUTER_API_KEY || "").trim();
 
-    // 1. STREAMING CHAT
+    // 1. STREAMING CHAT (Optimized Context & Token Cap)
     if (action === 'streamChat') {
-        const { text, history = [] } = payload || {};
+        const { text, summary = '', compactHistory = '', history = [] } = payload || {};
         if (!text) {
             return res.status(400).json({ error: 'Missing text in payload.' });
         }
 
-        const recentHistory = history.slice(0, 30).map(t => ({
-            date: t.date,
-            amount: t.amount,
-            category: t.category,
-            note: t.note,
-            type: t.type
-        }));
+        const contextBlock = summary
+            ? `Financial Snapshot: ${summary}\nRecent Activity (Date|Amt|Cat|Note):\n${compactHistory}`
+            : `User's Recent Financial Activity: ${JSON.stringify(history.slice(0, 10))}`;
 
-        const systemPrompt = `You are Kore AI, an ultra-fast, intelligent personal finance assistant.
-Today's Date: ${new Date().toISOString().split('T')[0]}
-User's Recent Financial Activity: ${JSON.stringify(recentHistory)}
+        const systemPrompt = `You are Kore AI, an ultra-fast personal finance assistant.
+Today: ${new Date().toISOString().split('T')[0]}
+${contextBlock}
 
 Rules:
 1. Detect user's language (Romanian or English) and reply concisely in the same language.
-2. Be helpful, direct, and conversational. Give clear monetary calculations if asked.
-3. Keep responses under 2-3 short paragraphs for fast delivery.`;
+2. Be direct, conversational, and provide clear monetary calculations if asked.
+3. Keep response under 2 short paragraphs for speed and token efficiency.`;
 
         // Set SSE Streaming Headers
         res.writeHead(200, {
@@ -273,13 +273,14 @@ Rules:
 
         let streamedSuccessfully = false;
 
-        // Priority 1: Gemini Streaming
+        // Priority 1: Gemini Streaming (maxOutputTokens: 350)
         if (geminiApiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(geminiApiKey);
                 const model = genAI.getGenerativeModel({
-                    model: "gemini-1.5-flash",
-                    systemInstruction: systemPrompt
+                    model: "gemini-3.6-flash",
+                    systemInstruction: systemPrompt,
+                    generationConfig: { maxOutputTokens: 350 }
                 });
 
                 const result = await model.generateContentStream(text);
@@ -295,7 +296,7 @@ Rules:
             }
         }
 
-        // Priority 2: OpenRouter Streaming (Fallback)
+        // Priority 2: OpenRouter Streaming (max_tokens: 350)
         if (!streamedSuccessfully && openrouterApiKey) {
             try {
                 const client = new OpenAI({
@@ -314,6 +315,7 @@ Rules:
                         { role: "user", content: text }
                     ],
                     temperature: 0.3,
+                    max_tokens: 350,
                     stream: true,
                     extra_body: {
                         models: FALLBACK_OPENROUTER_MODELS
@@ -343,7 +345,7 @@ Rules:
         return res.end();
     }
 
-    // 2. QUICK VOICE SHORTCUT
+    // 2. QUICK VOICE SHORTCUT (Token Cap: 128)
     if (action === 'parseVoiceShortcut') {
         const { text } = payload || {};
         if (!text || !text.trim()) {
@@ -351,8 +353,8 @@ Rules:
         }
 
         const prompt = `Extract transaction details into strict JSON:
-Current Date: ${new Date().toISOString().split('T')[0]}
-User Input: "${text}"
+Today: ${new Date().toISOString().split('T')[0]}
+Input: "${text}"
 
 Schema:
 {
@@ -373,10 +375,10 @@ Rules:
 6. merchant: clean store/vendor name or "".
 7. Output pure raw JSON only.`;
 
-        // Priority 1: Gemini
+        // Priority 1: Gemini (maxOutputTokens: 128)
         if (geminiApiKey) {
             try {
-                const rawText = await callGemini(geminiApiKey, prompt, "You are a fast JSON financial extraction engine. Output only valid JSON.", true);
+                const rawText = await callGemini(geminiApiKey, prompt, "Fast JSON financial extraction engine. Output only valid JSON.", true, 128);
                 const parsed = extractAndParseJson(rawText);
                 return res.status(200).json({ result: parsed, provider: 'gemini' });
             } catch (err) {
@@ -384,13 +386,13 @@ Rules:
             }
         }
 
-        // Priority 2: OpenRouter
+        // Priority 2: OpenRouter (maxTokens: 128)
         if (openrouterApiKey) {
             try {
                 const rawText = await callOpenRouter(openrouterApiKey, [
-                    { role: "system", content: "You are a fast JSON financial extraction engine. Output only valid JSON." },
+                    { role: "system", content: "Fast JSON financial extraction engine. Output only valid JSON." },
                     { role: "user", content: prompt }
-                ]);
+                ], 128);
                 const parsed = extractAndParseJson(rawText);
                 return res.status(200).json({ result: parsed, provider: 'openrouter' });
             } catch (err) {
@@ -403,24 +405,20 @@ Rules:
         return res.status(200).json({ result: localData, provider: 'local', fallback: true });
     }
 
-    // 3. PARSE TRANSACTION & INTENT DETECTION
+    // 3. PARSE TRANSACTION & INTENT DETECTION (Compressed Context & Token Cap: 256)
     if (action === 'parseTransaction') {
-        const { text, history = [] } = payload || {};
+        const { text, summary = '', compactHistory = '', history = [] } = payload || {};
         if (!text) {
             return res.status(400).json({ error: 'Missing text in payload.' });
         }
 
-        const recentHistory = history.slice(0, 40).map(t => ({
-            date: t.date,
-            amount: t.amount,
-            category: t.category,
-            note: t.note,
-            type: t.type
-        }));
+        const contextBlock = summary
+            ? `Financial Snapshot: ${summary}\nRecent Activity (Date|Amt|Cat|Note):\n${compactHistory}`
+            : `Transaction History: ${JSON.stringify(history.slice(0, 10).map(t => ({ date: t.date, amount: t.amount, category: t.category, note: t.note, type: t.type })))}`;
 
         const prompt = `
-Current Date: ${new Date().toISOString().split('T')[0]}
-Transaction History: ${JSON.stringify(recentHistory)}
+Today: ${new Date().toISOString().split('T')[0]}
+${contextBlock}
 User Input: "${text}"
 
 Analyze User Input and determine INTENT.
@@ -462,10 +460,10 @@ Output JSON:
 Rules: Output pure valid JSON only.
 `;
 
-        // Priority 1: Gemini
+        // Priority 1: Gemini (maxOutputTokens: 500)
         if (geminiApiKey) {
             try {
-                const rawText = await callGemini(geminiApiKey, prompt, "You are a financial AI assistant. Output strictly valid JSON.", true);
+                const rawText = await callGemini(geminiApiKey, prompt, "Financial AI assistant. Output strictly valid JSON.", true, 500);
                 const parsed = extractAndParseJson(rawText);
                 return res.status(200).json({ result: parsed, provider: 'gemini' });
             } catch (err) {
@@ -473,19 +471,20 @@ Rules: Output pure valid JSON only.
             }
         }
 
-        // Priority 2: OpenRouter
+        // Priority 2: OpenRouter (maxTokens: 500)
         if (openrouterApiKey) {
             try {
                 const rawText = await callOpenRouter(openrouterApiKey, [
-                    { role: "system", content: "You are a financial AI assistant. Output strictly valid JSON." },
+                    { role: "system", content: "Financial AI assistant. Output strictly valid JSON." },
                     { role: "user", content: prompt }
-                ]);
+                ], 500);
                 const parsed = extractAndParseJson(rawText);
                 return res.status(200).json({ result: parsed, provider: 'openrouter' });
             } catch (err) {
                 console.warn("[OpenRouter Fallback] parseTransaction error, cascading to local:", err.message);
             }
         }
+
 
         // Priority 3: Local Engine
         const local = fallbackParseTransaction(text, history);
@@ -505,7 +504,7 @@ Rules: Output pure valid JSON only.
         });
     }
 
-    // 4. GENERATE FORECAST
+    // 4. GENERATE FORECAST (Token Cap: 512)
     if (action === 'generateForecast') {
         const { transactions = [], currentBalance = 0 } = payload || {};
 
@@ -515,6 +514,7 @@ Rules: Output pure valid JSON only.
 
         const history = transactions
             .filter(t => new Date(t.date) >= ninetyDaysAgo)
+            .slice(-15)
             .map(t => ({
                 date: t.date,
                 amount: t.amount,
@@ -525,7 +525,7 @@ Rules: Output pure valid JSON only.
         const prompt = `
 Current Date: ${today.toISOString().split('T')[0]}
 Current Balance: ${currentBalance}
-Recent History: ${JSON.stringify(history.slice(-30))}
+Recent Activity: ${JSON.stringify(history)}
 
 Forecast daily balance for NEXT 30 DAYS based on recurring bills and average spending.
 Return STRICT JSON array:
@@ -534,10 +534,10 @@ Return STRICT JSON array:
 ]
 `;
 
-        // Priority 1: Gemini
+        // Priority 1: Gemini (maxOutputTokens: 512)
         if (geminiApiKey) {
             try {
-                const rawText = await callGemini(geminiApiKey, prompt, "You are a cash flow forecasting assistant. Output only a strict JSON array.", true);
+                const rawText = await callGemini(geminiApiKey, prompt, "Cash flow forecasting assistant. Output only a strict JSON array.", true, 512);
                 const data = extractAndParseJson(rawText);
                 if (Array.isArray(data) && data.length >= 10) {
                     return res.status(200).json({ result: data, provider: 'gemini' });
@@ -547,13 +547,13 @@ Return STRICT JSON array:
             }
         }
 
-        // Priority 2: OpenRouter
+        // Priority 2: OpenRouter (maxTokens: 512)
         if (openrouterApiKey) {
             try {
                 const rawText = await callOpenRouter(openrouterApiKey, [
-                    { role: "system", content: "You are a cash flow forecasting assistant. Output only a strict JSON array." },
+                    { role: "system", content: "Cash flow forecasting assistant. Output only a strict JSON array." },
                     { role: "user", content: prompt }
-                ]);
+                ], 512);
                 const data = extractAndParseJson(rawText);
                 if (Array.isArray(data) && data.length >= 10) {
                     return res.status(200).json({ result: data, provider: 'openrouter' });
@@ -568,7 +568,7 @@ Return STRICT JSON array:
         return res.status(200).json({ result: localForecast, provider: 'local', fallback: true });
     }
 
-    // 5. SUGGEST CATEGORY
+    // 5. SUGGEST CATEGORY (Token Cap: 32)
     if (action === 'suggestCategory') {
         const { note = '', existingCategories = [] } = payload || {};
 
@@ -577,15 +577,14 @@ Return STRICT JSON array:
         }
 
         const prompt = `
-Map transaction note "${note}" to one of these categories: ${JSON.stringify(existingCategories)}.
-If none match, return a clean 1-word English category.
+Map transaction note "${note}" to one of: ${JSON.stringify(existingCategories)}.
 Output JSON: { "category": "CategoryName" }
 `;
 
-        // Priority 1: Gemini
+        // Priority 1: Gemini (maxOutputTokens: 32)
         if (geminiApiKey) {
             try {
-                const rawText = await callGemini(geminiApiKey, prompt, "You are a category matching assistant. Output only valid JSON.", true);
+                const rawText = await callGemini(geminiApiKey, prompt, "Category matching assistant. Output only valid JSON.", true, 32);
                 const data = extractAndParseJson(rawText);
                 return res.status(200).json({ result: data?.category || null, provider: 'gemini' });
             } catch (err) {
@@ -593,13 +592,13 @@ Output JSON: { "category": "CategoryName" }
             }
         }
 
-        // Priority 2: OpenRouter
+        // Priority 2: OpenRouter (maxTokens: 32)
         if (openrouterApiKey) {
             try {
                 const rawText = await callOpenRouter(openrouterApiKey, [
-                    { role: "system", content: "You are a category matching assistant. Output only valid JSON." },
+                    { role: "system", content: "Category matching assistant. Output only valid JSON." },
                     { role: "user", content: prompt }
-                ]);
+                ], 32);
                 const data = extractAndParseJson(rawText);
                 return res.status(200).json({ result: data?.category || null, provider: 'openrouter' });
             } catch (err) {
