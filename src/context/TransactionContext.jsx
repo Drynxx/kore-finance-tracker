@@ -1,14 +1,27 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { databases, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
+import {
+    getCurrentMonthKey,
+    getTransactionMonthKey,
+    formatMonthYear,
+    formatMonthShort,
+    getPreviousMonthKey,
+    getNextMonthKey,
+    getDaysElapsedInMonth
+} from '../utils/date';
 
 export const TransactionContext = createContext();
 
 export const TransactionProvider = ({ children }) => {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
     const { user } = useAuth();
+
+    const currentMonthKey = getCurrentMonthKey();
+    const isCurrentMonth = selectedMonth === currentMonthKey;
 
     // Load transactions from Appwrite when user changes
     useEffect(() => {
@@ -130,10 +143,153 @@ export const TransactionProvider = ({ children }) => {
         }
     };
 
+    // Calculate available historical months from transactions + current month
+    const availableMonths = useMemo(() => {
+        const monthMap = new Map();
+
+        // Always ensure the current month exists
+        monthMap.set(currentMonthKey, {
+            key: currentMonthKey,
+            label: formatMonthYear(currentMonthKey),
+            shortLabel: formatMonthShort(currentMonthKey),
+            count: 0,
+            income: 0,
+            expense: 0,
+            net: 0,
+            isCurrent: true
+        });
+
+        // Group transaction stats by month
+        transactions.forEach(t => {
+            const key = getTransactionMonthKey(t.date);
+            if (!key) return;
+
+            if (!monthMap.has(key)) {
+                monthMap.set(key, {
+                    key,
+                    label: formatMonthYear(key),
+                    shortLabel: formatMonthShort(key),
+                    count: 0,
+                    income: 0,
+                    expense: 0,
+                    net: 0,
+                    isCurrent: key === currentMonthKey
+                });
+            }
+
+            const monthData = monthMap.get(key);
+            monthData.count += 1;
+            const amt = parseFloat(t.amount) || 0;
+            if (amt > 0 || t.type === 'income') {
+                monthData.income += Math.abs(amt);
+            } else {
+                monthData.expense += Math.abs(amt);
+            }
+            monthData.net = monthData.income - monthData.expense;
+        });
+
+        // Sort descending (newest month first)
+        return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+    }, [transactions, currentMonthKey]);
+
+    // Transactions filtered by the selected period
+    const monthlyTransactions = useMemo(() => {
+        if (!selectedMonth || selectedMonth === 'all') {
+            return transactions;
+        }
+        return transactions.filter(t => getTransactionMonthKey(t.date) === selectedMonth);
+    }, [transactions, selectedMonth]);
+
+    // Calculate metrics for selected period & all-time
+    const monthlyStats = useMemo(() => {
+        // Selected period totals
+        const mAmounts = monthlyTransactions.map(t => {
+            const amt = parseFloat(t.amount) || 0;
+            return (t.type === 'income' || amt > 0) ? Math.abs(amt) : -Math.abs(amt);
+        });
+
+        const monthlyIncome = mAmounts
+            .filter(a => a > 0)
+            .reduce((acc, a) => acc + a, 0);
+
+        const monthlyExpense = mAmounts
+            .filter(a => a < 0)
+            .reduce((acc, a) => acc + Math.abs(a), 0);
+
+        const monthlyNet = monthlyIncome - monthlyExpense;
+
+        const daysElapsed = getDaysElapsedInMonth(selectedMonth);
+        const dailyAverage = monthlyExpense / Math.max(daysElapsed, 1);
+
+        const savingsRate = monthlyIncome > 0
+            ? Math.max(0, Math.round(((monthlyIncome - monthlyExpense) / monthlyIncome) * 100))
+            : 0;
+
+        // All-time totals
+        const allAmounts = transactions.map(t => {
+            const amt = parseFloat(t.amount) || 0;
+            return (t.type === 'income' || amt > 0) ? Math.abs(amt) : -Math.abs(amt);
+        });
+
+        const allTimeIncome = allAmounts
+            .filter(a => a > 0)
+            .reduce((acc, a) => acc + a, 0);
+
+        const allTimeExpense = allAmounts
+            .filter(a => a < 0)
+            .reduce((acc, a) => acc + Math.abs(a), 0);
+
+        const allTimeBalance = allTimeIncome - allTimeExpense;
+
+        return {
+            monthlyIncome,
+            monthlyExpense,
+            monthlyNet,
+            dailyAverage,
+            savingsRate,
+            allTimeBalance,
+            allTimeIncome,
+            allTimeExpense,
+            daysElapsed
+        };
+    }, [monthlyTransactions, transactions, selectedMonth]);
+
+    // Period Navigation Helpers
+    const goToPreviousMonth = () => {
+        if (selectedMonth === 'all') {
+            setSelectedMonth(currentMonthKey);
+            return;
+        }
+        setSelectedMonth(getPreviousMonthKey(selectedMonth));
+    };
+
+    const goToNextMonth = () => {
+        if (selectedMonth === 'all') {
+            setSelectedMonth(currentMonthKey);
+            return;
+        }
+        setSelectedMonth(getNextMonthKey(selectedMonth));
+    };
+
+    const goToCurrentMonth = () => {
+        setSelectedMonth(currentMonthKey);
+    };
+
     return (
         <TransactionContext.Provider
             value={{
                 transactions,
+                allTransactions: transactions,
+                monthlyTransactions,
+                selectedMonth,
+                setSelectedMonth,
+                currentMonthKey,
+                isCurrentMonth,
+                availableMonths,
+                monthlyStats,
+                goToPreviousMonth,
+                goToNextMonth,
+                goToCurrentMonth,
                 addTransaction,
                 deleteTransaction,
                 updateTransaction,
@@ -144,3 +300,4 @@ export const TransactionProvider = ({ children }) => {
         </TransactionContext.Provider>
     );
 };
+

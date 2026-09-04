@@ -2,19 +2,56 @@ import React, { useContext, useMemo, useState, useEffect } from 'react';
 import { TransactionContext } from '../context/TransactionContext';
 import { generateCashFlowForecast, generateStatisticalForecast } from '../services/gemini';
 import { useCurrency } from '../context/CurrencyContext';
+import { formatMonthYear, getTransactionMonthKey } from '../utils/date';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion } from 'framer-motion';
 
 export const BudgetGraph = () => {
-    const { transactions } = useContext(TransactionContext);
+    const { transactions, selectedMonth, currentMonthKey, isCurrentMonth } = useContext(TransactionContext);
     const { formatAmount } = useCurrency();
     const [forecastData, setForecastData] = useState([]);
-    const [isLoadingForecast, setIsLoadingForecast] = useState(true);
+    const [isLoadingForecast, setIsLoadingForecast] = useState(false);
 
-    // 1. Calculate Historical Balance (Last 30 Days)
+    const isAllTime = selectedMonth === 'all';
+    const isPastMonth = !isAllTime && !isCurrentMonth;
+
+    // 1. Calculate Historical Balance (Last 30 Days OR Selected Month Archive)
     const historicalData = useMemo(() => {
         if (!transactions || !transactions.length) return [];
 
+        // If viewing an archived past month, compute that specific month's daily curve
+        if (isPastMonth) {
+            const [yearStr, monthStr] = selectedMonth.split('-');
+            const year = parseInt(yearStr, 10);
+            const monthIndex = parseInt(monthStr, 10) - 1;
+            const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+            let runningSum = 0;
+            const days = [];
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+                const dayTransactions = transactions.filter(t => t.date && t.date.startsWith(dayStr));
+
+                const dayNet = dayTransactions.reduce((sum, t) => {
+                    const amt = Math.abs(parseFloat(t.amount) || 0);
+                    return sum + (t.type === 'income' || t.amount > 0 ? amt : -amt);
+                }, 0);
+
+                runningSum += dayNet;
+
+                days.push({
+                    date: dayStr,
+                    day: d,
+                    balance: Math.round(runningSum * 100) / 100,
+                    netChange: dayNet,
+                    type: 'historical'
+                });
+            }
+            return days;
+        }
+
+        // Default: Last 30 Days ending today
         const currentBalance = transactions.reduce((sum, t) => {
             const amt = Math.abs(parseFloat(t.amount) || 0);
             return sum + (t.type === 'income' || t.amount > 0 ? amt : -amt);
@@ -30,7 +67,7 @@ export const BudgetGraph = () => {
             date.setDate(date.getDate() - i);
             const dateStr = date.toISOString().split('T')[0];
 
-            const dayTransactions = transactions.filter(t => t.date === dateStr);
+            const dayTransactions = transactions.filter(t => t.date && t.date.startsWith(dateStr));
             const dayNetChange = dayTransactions.reduce((sum, t) => {
                 const amt = Math.abs(parseFloat(t.amount) || 0);
                 return sum + (t.type === 'income' || t.amount > 0 ? amt : -amt);
@@ -46,10 +83,16 @@ export const BudgetGraph = () => {
             runningBalance -= dayNetChange;
         }
         return days;
-    }, [transactions]);
+    }, [transactions, selectedMonth, isPastMonth]);
 
-    // 2. Fetch Forecast with statistical fallback
+    // 2. Fetch Forecast (only for active current month / all time)
     useEffect(() => {
+        if (isPastMonth) {
+            setForecastData([]);
+            setIsLoadingForecast(false);
+            return;
+        }
+
         let isMounted = true;
 
         const fetchForecast = async () => {
@@ -58,6 +101,7 @@ export const BudgetGraph = () => {
                 return;
             }
 
+            setIsLoadingForecast(true);
             const currentBalance = historicalData[historicalData.length - 1]?.balance || 0;
 
             try {
@@ -91,13 +135,13 @@ export const BudgetGraph = () => {
         return () => {
             isMounted = false;
         };
-    }, [transactions, historicalData]);
+    }, [transactions, historicalData, isPastMonth]);
 
     // Combine Data: Ensure smooth connection
     const chartData = useMemo(() => {
         if (!historicalData.length) return [];
-        return [...historicalData, ...forecastData];
-    }, [historicalData, forecastData]);
+        return isPastMonth ? historicalData : [...historicalData, ...forecastData];
+    }, [historicalData, forecastData, isPastMonth]);
 
     const CustomTooltip = ({ active, payload }) => {
         if (active && payload && payload.length) {
@@ -110,6 +154,11 @@ export const BudgetGraph = () => {
                     <p className="text-white font-bold text-base">
                         {formatAmount(dataPoint.balance || 0)}
                     </p>
+                    {isPastMonth && dataPoint.netChange !== undefined && dataPoint.netChange !== 0 && (
+                        <p className={`text-xs mt-1 font-mono ${dataPoint.netChange > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {dataPoint.netChange > 0 ? '+' : ''}{formatAmount(dataPoint.netChange)} on this day
+                        </p>
+                    )}
                     {dataPoint.type === 'predicted' && (
                         <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
@@ -128,7 +177,7 @@ export const BudgetGraph = () => {
         return (
             <div className="w-full h-[240px] flex flex-col items-center justify-center text-center p-6 rounded-2xl bg-white/5 border border-white/5">
                 <p className="text-sm font-medium text-slate-300">No transaction data yet</p>
-                <p className="text-xs text-slate-500 mt-1">Log your first expense or income to see your 30-day cash flow forecast.</p>
+                <p className="text-xs text-slate-500 mt-1">Log your first expense or income to see your cash flow forecast.</p>
             </div>
         );
     }
@@ -142,8 +191,14 @@ export const BudgetGraph = () => {
         >
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h3 className="text-base font-semibold text-white tracking-tight">Cash Flow Forecast</h3>
-                    <p className="text-xs text-slate-400">Past 30 Days + 30-Day Predictive Projection</p>
+                    <h3 className="text-base font-semibold text-white tracking-tight">
+                        {isPastMonth ? `${formatMonthYear(selectedMonth)} Cash Flow` : 'Cash Flow Forecast'}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                        {isPastMonth
+                            ? `Daily net progression across ${formatMonthYear(selectedMonth)}`
+                            : 'Past 30 Days + 30-Day Predictive Projection'}
+                    </p>
                 </div>
                 {isLoadingForecast && (
                     <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20">
@@ -157,6 +212,7 @@ export const BudgetGraph = () => {
                 {chartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+
                             <defs>
                                 <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4} />

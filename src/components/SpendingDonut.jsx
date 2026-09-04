@@ -6,10 +6,12 @@ import { motion } from 'framer-motion';
 
 const COLORS = ['#ef4444', '#f97316', '#8b5cf6', '#3b82f6', '#10b981'];
 
-export const SpendingDonut = () => {
-    const { transactions } = useContext(TransactionContext);
+export const SpendingDonut = ({ customTransactions = null }) => {
+    const { monthlyTransactions, selectedMonth, isCurrentMonth } = useContext(TransactionContext);
     const { formatAmount } = useCurrency();
     const [activeIndex, setActiveIndex] = useState(0);
+
+    const activeList = customTransactions || monthlyTransactions || [];
 
     const onPieEnter = (_, index) => {
         setActiveIndex(index);
@@ -19,11 +21,12 @@ export const SpendingDonut = () => {
         const categories = {};
         let total = 0;
 
-        transactions.forEach(t => {
-            if (t.amount < 0) {
-                const amount = Math.abs(t.amount);
-                categories[t.category] = (categories[t.category] || 0) + amount;
-                total += amount;
+        activeList.forEach(t => {
+            const amt = parseFloat(t.amount) || 0;
+            if (t.type === 'expense' || amt < 0) {
+                const absAmount = Math.abs(amt);
+                categories[t.category] = (categories[t.category] || 0) + absAmount;
+                total += absAmount;
             }
         });
 
@@ -31,15 +34,21 @@ export const SpendingDonut = () => {
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value)
             .slice(0, 5); // Top 5 categories
-    }, [transactions]);
+    }, [activeList]);
 
     if (data.length === 0) {
         return (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm italic">
-                No spending data
+            <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <p className="text-slate-300 text-xs font-semibold">
+                    {isCurrentMonth ? 'Clean Slate This Month' : 'No Spending Logged'}
+                </p>
+                <p className="text-slate-500 text-[11px] mt-0.5 max-w-[170px]">
+                    {isCurrentMonth ? 'No expenses recorded yet for this month.' : 'No expense entries in this period.'}
+                </p>
             </div>
         );
     }
+
 
     return (
         <div className="h-full w-full flex flex-col">
