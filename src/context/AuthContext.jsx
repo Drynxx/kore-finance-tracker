@@ -133,6 +133,25 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // User Personal Ingestion Sync Token for Apple Pay & Google Pay Webhooks
+    const ingestionKey = user
+        ? `kore_sync_${user.$id}_${(user.$createdAt || 'active').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)}`
+        : '';
+
+    const getWebhookUrl = () => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://kore-finance.vercel.app';
+        return `${origin}/api/quick-transaction`;
+    };
+
+    const getQuickLogUrl = (extraParams = {}) => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://kore-finance.vercel.app';
+        const url = new URL(`${origin}/quick-log`);
+        Object.entries(extraParams).forEach(([k, v]) => {
+            if (v) url.searchParams.set(k, v);
+        });
+        return url.toString();
+    };
+
     return (
         <AuthContext.Provider value={{
             user,
@@ -144,7 +163,10 @@ export const AuthProvider = ({ children }) => {
             completeVerification,
             sendPasswordReset,
             completePasswordReset,
-            checkSession // Exposed for manual refresh
+            checkSession, // Exposed for manual refresh
+            ingestionKey,
+            getWebhookUrl,
+            getQuickLogUrl
         }}>
             {children}
         </AuthContext.Provider>

@@ -1,7 +1,8 @@
 import React, { createContext, useState, useEffect, useMemo } from 'react';
 import { useAuth } from './AuthContext';
-import { databases, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
+import { client, databases, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
+import { sendTransactionConfirmationNotification } from '../utils/notifications';
 import {
     getCurrentMonthKey,
     getTransactionMonthKey,
@@ -23,14 +24,74 @@ export const TransactionProvider = ({ children }) => {
     const currentMonthKey = getCurrentMonthKey();
     const isCurrentMonth = selectedMonth === currentMonthKey;
 
-    // Load transactions from Appwrite when user changes
+    // Load transactions from Appwrite when user changes & subscribe to Realtime events
     useEffect(() => {
-        if (user) {
-            loadTransactions();
-        } else {
+        if (!user) {
             setTransactions([]);
             setLoading(false);
+            return;
         }
+
+        loadTransactions();
+
+        // Subscribe to Appwrite Realtime events for incoming webhook & background sync transactions
+        let unsubscribe = null;
+        try {
+            unsubscribe = client.subscribe(
+                `databases.${DATABASE_ID}.collections.${COLLECTION_ID}.documents`,
+                response => {
+                    const isCreate = response.events.some(e => e.includes('.create'));
+                    const isDelete = response.events.some(e => e.includes('.delete'));
+                    const isUpdate = response.events.some(e => e.includes('.update'));
+                    const doc = response.payload;
+
+                    if (!doc || doc.userId !== user.$id) return;
+
+                    if (isCreate) {
+                        const incomingTx = {
+                            id: doc.$id,
+                            type: doc.type,
+                            amount: doc.amount,
+                            category: doc.category,
+                            date: doc.date,
+                            note: doc.note || ''
+                        };
+
+                        setTransactions(prev => {
+                            if (prev.some(t => t.id === incomingTx.id)) return prev;
+                            return [incomingTx, ...prev];
+                        });
+
+                        // Dispatch confirmation notification if created externally
+                        const source = incomingTx.note.includes('Apple Pay') 
+                            ? 'Apple Pay' 
+                            : incomingTx.note.includes('Google Pay') || incomingTx.note.includes('Google') 
+                            ? 'Google Pay' 
+                            : 'Auto-Pay';
+                        sendTransactionConfirmationNotification(incomingTx, source);
+                    } else if (isDelete) {
+                        setTransactions(prev => prev.filter(t => t.id !== doc.$id));
+                    } else if (isUpdate) {
+                        setTransactions(prev => prev.map(t => t.id === doc.$id ? {
+                            id: doc.$id,
+                            type: doc.type,
+                            amount: doc.amount,
+                            category: doc.category,
+                            date: doc.date,
+                            note: doc.note || ''
+                        } : t));
+                    }
+                }
+            );
+        } catch (subErr) {
+            console.warn('Realtime subscription not active:', subErr);
+        }
+
+        return () => {
+            if (unsubscribe && typeof unsubscribe === 'function') {
+                unsubscribe();
+            }
+        };
     }, [user]);
 
     const loadTransactions = async () => {

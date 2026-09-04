@@ -58,6 +58,47 @@ graph TD
 
 ---
 
+## 💳 Option 1.5: 🍏 Apple Pay 100% Background Automation (iOS 17+)
+
+Instead of speaking, you can have your iPhone **automatically log expenses the moment you tap to pay with Apple Pay at any terminal**!
+
+```mermaid
+graph LR
+    A["Apple Pay Tap / Payment"] --> B["iOS Automation Trigger:<br/>Wallet > Transaction"]
+    B --> C["Get Contents of URL<br/>(POST to /api/quick-transaction)"]
+    C --> D["Show Notification<br/>'💳 Logged 24.50 RON at Starbucks'"]
+```
+
+### 🛠️ 60-Second Setup:
+1. Open the **Shortcuts** app on your iPhone.
+2. Tap the **Automation** tab at the bottom, then tap **`+`** (New Automation).
+3. Search for **Transaction** (under *Cards & Passes / Wallet*).
+4. Settings:
+   - **Card**: Select *Any Card* (or your specific credit/debit card).
+   - **Category / Merchant**: Any.
+   - **When**: Select **Run Immediately** (do NOT choose *Ask Before Running*).
+   - **Notify When Run**: Optional (keep off if you want only Kore's notification).
+5. Tap **Next**, then choose **New Blank Automation**:
+   - **Action 1: "Get Contents of URL"**
+     - URL: `https://[your-kore-domain]/api/quick-transaction`
+     - Method: **POST**
+     - Request Body: **JSON**
+     - Add fields:
+       - `apiKey`: `[Your Personal Sync Key from Kore Settings > Auto-Pay]`
+       - `amount`: *Shortcut Input &gt; Amount*
+       - `merchant`: *Shortcut Input &gt; Merchant*
+       - `currency`: *Shortcut Input &gt; Currency Code*
+       - `source`: `Apple Pay`
+   - **Action 2: "Get Dictionary Value"**
+     - Key: `notification.body`
+     - Dictionary: *Contents of URL*
+   - **Action 3: "Show Notification"**
+     - Text: *Dictionary Value*
+     - Title: `Kore Finance`
+6. Tap **Done**. Now every Apple Pay purchase logs invisibly in the background and rings with your confirmation!
+
+---
+
 ## 🤖 Option 2: Android (Google Gemini, Assistant & Quick Actions)
 
 > [!NOTE]
@@ -97,6 +138,38 @@ If you want a physical gesture trigger (e.g. double-pressing the volume button, 
      ```
 3. Save the Macro as **"Log Expense"**.
 4. Now whenever you trigger it, your phone listens to your voice and immediately sends it into Kore!
+
+---
+
+### 🤖 Method B.2: Android Automatic Google Wallet & Bank Notification Tracker (MacroDroid)
+
+Automatically capture incoming notifications from **Google Pay / Google Wallet** or your bank (Revolut, ING, BCR, Chase, etc.) without touching your phone:
+
+1. Open **MacroDroid** $\rightarrow$ Tap **Add Macro**.
+2. **Trigger:**
+   - Tap **`+`** $\rightarrow$ **Notification** $\rightarrow$ **Notification Received**.
+   - Select **Applications**: Choose **Google Wallet** (`com.google.android.apps.walletnf`), **Revolut**, or your Banking app.
+   - Text content: Select **Any**.
+3. **Action 1: HTTP Request (POST Ingestion)**:
+   - Tap **`+`** $\rightarrow$ **Connectivity** $\rightarrow$ **HTTP Request**.
+   - URL: `https://[your-kore-domain]/api/quick-transaction`
+   - Request Method: **POST**
+   - Content Type: `application/json`
+   - Body:
+     ```json
+     {
+       "apiKey": "[Your Personal Sync Key from Kore Settings > Auto-Pay]",
+       "text": "[notif_text]",
+       "source": "Google Pay"
+     }
+     ```
+   - Save response to a string variable: `kore_response`.
+4. **Action 2: Display Notification**:
+   - Tap **`+`** $\rightarrow$ **Notification** $\rightarrow$ **Display Notification**.
+   - Title: `💳 Kore Finance`
+   - Message: `[lv=kore_response]` (or `Logged transaction from Google Pay`)
+5. Save the macro as **"Kore Google Pay Sync"**.
+6. Whenever you pay with Google Pay, Android automatically sends the notification to Kore, records the transaction with AI categorization, and confirms on your screen!
 
 ---
 

@@ -5,7 +5,8 @@ import { useVoiceParser } from '../hooks/useVoiceParser';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { databases, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
 import { ID } from 'appwrite';
-import { CheckCircle2, AlertCircle, Sparkles, CreditCard, Banknote, ArrowRight, RefreshCw, Mic, MicOff, Globe, StopCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Sparkles, CreditCard, Banknote, ArrowRight, RefreshCw, Mic, MicOff, Globe, StopCircle, Bell } from 'lucide-react';
+import { sendTransactionConfirmationNotification } from '../utils/notifications';
 
 /**
  * Extracts voice text from URL parameters or protocol handler payloads.
@@ -152,8 +153,25 @@ export const QuickLogHandler = () => {
                 docData
             );
 
-            // Step 3: Success state & Haptics
+            // Step 3: Success state, Notification & Haptics
             setStatus('success');
+            
+            // Dispatch native Web/OS notification confirmation
+            try {
+                const searchParams = new URLSearchParams(window.location.search);
+                const source = searchParams.get('source') || 
+                    (textToProcess.toLowerCase().includes('apple') ? 'Apple Pay' : 
+                     textToProcess.toLowerCase().includes('google') ? 'Google Pay' : 'Voice Shortcut');
+
+                sendTransactionConfirmationNotification({
+                    ...structuredData,
+                    amount: finalAmount,
+                    note: docData.note
+                }, source);
+            } catch (notifErr) {
+                console.debug('Notification dispatch in QuickLog:', notifErr);
+            }
+
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
                 try {
                     navigator.vibrate([100, 50, 100]);
