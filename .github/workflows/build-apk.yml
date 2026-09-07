@@ -42,6 +42,15 @@ jobs:
 
       - name: Build web application
         run: npm run build
+        env:
+          VITE_APPWRITE_ENDPOINT: 'https://fra.cloud.appwrite.io/v1'
+          VITE_APPWRITE_PROJECT_ID: '69247271000fd2e093f0'
+          VITE_APPWRITE_DATABASE_ID: '692472be00265c68d4e3'
+          VITE_APPWRITE_COLLECTION_ID: 'transaction'
+          VITE_APPWRITE_WALLPAPER_BUCKET_ID: '6925e6ad0016ac1036f4'
+          VITE_ELEVENLABS_VOICE_ID: '21m00Tcm4TlvDq8ikWAM'
+          VITE_APPWRITE_FUNCTION_ID_GEMINI: '6997105f003043e5aef4'
+          VITE_APPWRITE_FUNCTION_ID_ELEVENLABS: '69971161000e7d0277ef'
 
       - name: Sync Capacitor Android assets & plugins
         run: npx cap sync android
