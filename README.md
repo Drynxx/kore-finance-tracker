@@ -38,7 +38,6 @@
   - [Android APK & Auto-Pay Service](#android-apk--auto-pay-service)
   - [iOS 17+ Apple Wallet Shortcut](#ios-17-apple-wallet-shortcut)
   - [Progressive Web App (PWA)](#progressive-web-app-pwa)
-- [Configuration Reference](#configuration-reference)
 - [Project Documentation](#project-documentation)
 - [License](#license)
 
