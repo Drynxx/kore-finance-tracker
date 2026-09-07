@@ -38,7 +38,6 @@
   - [Android App & Auto-Pay Tracking](#android-app--auto-pay-tracking)
   - [iOS Apple Wallet Shortcuts](#ios-apple-wallet-shortcuts)
   - [Install as a Web App (PWA)](#install-as-a-web-app-pwa)
-- [Configuration Reference](#configuration-reference)
 - [Project Documentation](#project-documentation)
 - [License](#license)
 
@@ -281,30 +280,11 @@ You can install Kore directly to your home screen or desktop without an app stor
 
 ---
 
-## Configuration Reference
-
-| Variable | Required | Description |
-|:---|:---:|:---|
-| `VITE_APPWRITE_ENDPOINT` | **Yes** | Your Appwrite API URL (e.g., `https://cloud.appwrite.io/v1`) |
-| `VITE_APPWRITE_PROJECT_ID` | **Yes** | Project ID from your Appwrite dashboard |
-| `VITE_APPWRITE_DATABASE_ID` | **Yes** | Database ID holding your collections |
-| `VITE_APPWRITE_COLLECTION_ID` | **Yes** | Collection ID for transactions (usually `transaction`) |
-| `VITE_APPWRITE_WALLPAPER_BUCKET_ID`| **Yes** | Storage Bucket ID for background wallpapers |
-| `GEMINI_API_KEY` | **Yes** | API key powering the Kore voice agent's brain |
-| `OPENROUTER_API_KEY` | No | Optional secondary backup key for the agent |
-| `VITE_ELEVENLABS_VOICE_ID` | No | Voice ID for ElevenLabs speech playback |
-| `VITE_APPWRITE_FUNCTION_ID_GEMINI` | No | Optional Appwrite Cloud Function ID for server-side processing |
-| `VITE_APPWRITE_FUNCTION_ID_ELEVENLABS` | No | Optional Appwrite Cloud Function ID for audio synthesis |
-
----
-
 ## Project Documentation
 
 Helpful setup guides and architecture notes:
 - [CODEBASE_EXPLANATION.md](CODEBASE_EXPLANATION.md) — Walkthrough of the code structure, context providers, and components.
 - [GOOGLE_AND_APPLE_PAY_TRACKER_GUIDE.md](GOOGLE_AND_APPLE_PAY_TRACKER_GUIDE.md) — How the Android notification listener and iOS Apple Pay automations work.
-- [OS_SHORTCUTS_GUIDE.md](OS_SHORTCUTS_GUIDE.md) — Setting up voice shortcuts with Siri, Google Assistant, or the iPhone Action Button.
-- [ANDROID_PLAYSTORE_LAUNCH_PLAN.md](ANDROID_PLAYSTORE_LAUNCH_PLAN.md) — Checklist for building and publishing the Android app.
 
 ---
 
