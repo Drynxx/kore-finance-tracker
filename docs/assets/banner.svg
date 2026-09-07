@@ -100,10 +100,10 @@
 
   <!-- Feature Pills -->
   <g transform="translate(312, 235)">
-    <!-- Pill 1: Voice & Gemini -->
+    <!-- Pill 1: Voice & Personal Agent -->
     <rect x="0" y="0" width="168" height="34" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
     <circle cx="16" cy="17" r="4" fill="#38bdf8" />
-    <text x="28" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif" font-size="12" font-weight="600" fill="#e2e8f0">Gemini Voice Agent</text>
+    <text x="28" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif" font-size="12" font-weight="600" fill="#e2e8f0">Kore Personal Agent</text>
 
     <!-- Pill 2: Android Auto-Pay -->
     <rect x="180" y="0" width="176" height="34" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />

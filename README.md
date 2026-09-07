@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>An open-source, privacy-first personal finance tracker featuring natural voice logging, automated banking notification capture, and predictive cash flow analytics.</strong>
+  <strong>An open-source, privacy-first personal finance platform featuring an autonomous personal financial agent, automated banking notification capture, and predictive cash flow analytics.</strong>
 </p>
 
 <p align="center">
@@ -12,7 +12,7 @@
   <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-6.0-646CFF.svg?style=flat-square&logo=vite&logoColor=white" alt="Vite 6" /></a>
   <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind-3.4-38B2AC.svg?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" /></a>
   <a href="https://appwrite.io/"><img src="https://img.shields.io/badge/Backend-Appwrite-FD366E.svg?style=flat-square&logo=appwrite&logoColor=white" alt="Appwrite" /></a>
-  <a href="https://deepmind.google/technologies/gemini/"><img src="https://img.shields.io/badge/AI-Google%20Gemini-4285F4.svg?style=flat-square&logo=google&logoColor=white" alt="Google Gemini" /></a>
+  <img src="https://img.shields.io/badge/Agent-Kore%20Intelligence-6366F1.svg?style=flat-square" alt="Kore Personal Agent" />
   <a href="https://capacitorjs.com/"><img src="https://img.shields.io/badge/Mobile-Capacitor%20Android-119EFF.svg?style=flat-square&logo=capacitor&logoColor=white" alt="Capacitor Android" /></a>
   <img src="https://img.shields.io/badge/PWA-Ready-brightgreen.svg?style=flat-square" alt="PWA Ready" />
 </p>
@@ -24,8 +24,8 @@
 - [Overview](#overview)
 - [Interface Showcase](#interface-showcase)
 - [Key Capabilities](#key-capabilities)
-  - [1. Zero-Friction Transaction Ingestion](#1-zero-friction-transaction-ingestion)
-  - [2. Kore Intelligence Voice Engine](#2-kore-intelligence-voice-engine)
+  - [1. Autonomous Personal Financial Agent](#1-autonomous-personal-financial-agent)
+  - [2. Zero-Friction Transaction Ingestion](#2-zero-friction-transaction-ingestion)
   - [3. Predictive Cash Flow & Analytics](#3-predictive-cash-flow--analytics)
   - [4. Data Ownership & Portability](#4-data-ownership--portability)
 - [Architecture & Data Pipeline](#architecture--data-pipeline)
@@ -46,13 +46,13 @@
 
 ## Overview
 
-**Kore** is an intelligent personal finance platform designed to eliminate manual data entry. Rather than requiring users to manually fill out multi-field expense forms, Kore ingests transactions through three primary zero-friction channels:
+**Kore** is an autonomous personal finance platform engineered to eliminate manual financial administration. Rather than requiring users to manually balance budgets or fill out multi-field forms, Kore operates through an integrated **Personal Financial Agent** coupled with automated operating system pipelines:
 
-1. **Continuous Voice Parsing**: Natural speech parsing powered by Google Gemini (e.g., *"Spent 45 RON on groceries at Mega Image with card"*).
-2. **Android Background Notification Listener**: Native Android service running via Capacitor to automatically extract amounts, merchants, and categories from Google Wallet, Google Pay, Revolut, Wise, Monzo, and banking push notifications.
-3. **iOS 17+ Apple Wallet Automation**: Apple Shortcuts webhook triggering instant expense logging upon tapping an Apple Pay terminal.
+1. **Autonomous Personal Financial Agent**: Zero-touch conversational voice logging and natural language financial auditing (e.g., *"Spent 45 RON on groceries at Mega Image with card"* or *"What was my highest expense category this week?"*).
+2. **Android Background Notification Listener**: Native Android service running via Capacitor that automatically parses amounts, merchants, and categories from Google Wallet, Google Pay, Revolut, Wise, Monzo, and banking push notifications.
+3. **iOS 17+ Apple Wallet Automation**: Apple Shortcuts webhook triggering instantaneous expense logging upon tapping an Apple Pay terminal.
 
-All data is backed by an [Appwrite](https://appwrite.io) backend (cloud or self-hosted), ensuring users maintain complete privacy and ownership over their financial records.
+All records are persisted to an [Appwrite](https://appwrite.io) backend (cloud or self-hosted), ensuring users maintain complete privacy, sovereignty, and ownership over their financial records.
 
 ---
 
@@ -65,41 +65,42 @@ Full overview showing net balance, category breakdown ("Spending Art"), daily bu
   <img src="docs/screenshots/dashboard.png" alt="Kore Dashboard and Cash Flow Forecast" width="100%" />
 </p>
 
-### Voice Intelligence, Ledger, and Auto-Pay Settings
+### Personal Financial Agent, Ledger, and Auto-Pay Settings
 
-| Kore Voice Assistant | Transaction Ledger | System & Auto-Pay Settings |
+| Kore Personal Agent | Transaction Ledger | System & Auto-Pay Settings |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/ai_assistant.png" alt="Kore Intelligence Voice Assistant" width="100%" /> | <img src="docs/screenshots/transactions.png" alt="Transaction Ledger" width="100%" /> | <img src="docs/screenshots/settings.png" alt="Settings & Auto-Pay Configuration" width="100%" /> |
-| *Real-time dynamic voice visualizer & Gemini extraction* | *Categorized history with date segmentation & totals* | *Auto-Pay background listener & appearance preferences* |
+| <img src="docs/screenshots/ai_assistant.png" alt="Kore Personal Financial Agent" width="100%" /> | <img src="docs/screenshots/transactions.png" alt="Transaction Ledger" width="100%" /> | <img src="docs/screenshots/settings.png" alt="Settings & Auto-Pay Configuration" width="100%" /> |
+| *Real-time dynamic voice visualizer & autonomous agent parsing* | *Categorized history with date segmentation & totals* | *Auto-Pay background listener & appearance preferences* |
 
 ---
 
 ## Key Capabilities
 
-### 1. Zero-Friction Transaction Ingestion
-- **Android `NotificationListenerService`**: Automatically parses transactions from Google Pay, Google Wallet, Revolut, Wise, BT Pay, ING, and Monzo notifications. Writes directly to the Appwrite database when backgrounded, or updates state via local storage queue upon foregrounding.
-- **iOS 17+ Apple Wallet Shortcut**: Webhook protocol handler (`web+kore://` and `/quick-log`) compatible with native iOS Apple Wallet automation triggers.
-- **Manual Input Modal**: Keyboard entry with category tagging, haptic feedback, and date assignment.
+### 1. Autonomous Personal Financial Agent
+Kore operates with a dedicated personal agent engineered to continuously oversee, parse, and audit your cash flow:
+- **Context-Aware Structured Extraction**: Translates raw conversational speech and unstructured text into strictly typed ledger entries (`amount`, `category`, `type`, `date`, `note`, `payment_method`) without requiring rigid syntax or keyword constraints.
+- **Conversational Financial Auditing**: Directly query your agent with natural language questions like *"How much did I spend on dining out last month?"* or *"What is my current burn rate?"* for instant calculations derived from your active financial history.
+- **Bilingual Intent Reasoning**: Dual-mode speech processing and reasoning in both English and Romanian (`RO` / `EN` toggle).
+- **Acoustic Waveform Feedback**: Dynamic, math-driven audio cloud visualizer that pulses in real-time with vocal amplitude.
+- **Auditory Synthesis**: Optional spoken feedback powered by high-clarity voice synthesis via ElevenLabs.
 
-### 2. Kore Intelligence Voice Engine
-- **Structured JSON Extraction**: Translates colloquial voice input into typed data (`amount`, `category`, `type`, `date`, `note`, `payment_method`).
-- **Conversational Queries**: Answer questions like *"How much did I spend on dining out last month?"* with aggregated context-aware calculations.
-- **Bilingual Support**: Native prompt tuning and speech models for English and Romanian (`RO` / `EN` toggle).
-- **Acoustic Waveform Feedback**: Dynamic, math-driven audio cloud visualization that pulses with microphone amplitude.
-- **Text-to-Speech Output**: Optional conversational auditory feedback powered by ElevenLabs.
+### 2. Zero-Friction Transaction Ingestion
+- **Android `NotificationListenerService`**: Passively extracts transactions from Google Pay, Google Wallet, Revolut, Wise, BT Pay, ING, and Monzo notifications. Writes directly to the Appwrite database when backgrounded, or queues items in local storage for instant sync upon foregrounding.
+- **iOS 17+ Apple Wallet Shortcut**: Custom protocol handler (`web+kore://` and `/quick-log`) compatible with native iOS Apple Wallet automation triggers.
+- **Manual Ledger Entry**: Full-featured keyboard modal with quick categorization, date picker, and haptic feedback.
 
 ### 3. Predictive Cash Flow & Analytics
-- **30-Day Forward Forecast**: Computes spending velocity and projects balance trajectory over the next 30 days.
-- **Category Donut ("Spending Art")**: Real-time distribution showing top expenditure categories with interactive drill-down.
-- **Historical Month Traversal**: Month-by-month historical selector with quick "Show All Time" toggle and monthly reset workflows.
+- **30-Day Forward Forecast**: Evaluates historical spending velocity and projects net balance trajectory over the subsequent 30 days.
+- **Category Donut ("Spending Art")**: Real-time categorical distribution highlighting primary spending drivers with interactive drill-down.
+- **Historical Month Traversal**: Month-by-month historical selector with a single-click "Show All Time" toggle and monthly reset workflows.
 - **Multi-Currency Normalization**: On-the-fly currency conversion supporting USD, EUR, GBP, RON, and more.
 
 ### 4. Data Ownership & Portability
-- **Self-Hostable**: Compatible with any self-hosted or managed Appwrite instance.
+- **Self-Hostable Infrastructure**: Fully compatible with self-hosted Docker Appwrite deployments or Appwrite Cloud.
 - **One-Click Export**:
-  - **PDF Report**: Formatted transaction summary with custom auto-table styling.
-  - **CSV Export**: Raw transactional dataset formatted for external spreadsheet analysis.
-- **Zero Tracking**: No third-party ad networks, trackers, or telemetry.
+  - **PDF Audit Report**: Clean tabular breakdown with custom layout formatting.
+  - **CSV Raw Export**: Standard transactional dataset formatted for external spreadsheet analysis.
+- **Zero Third-Party Telemetry**: Zero tracking cookies, third-party analytics, or commercial advertising libraries.
 
 ---
 
@@ -109,23 +110,23 @@ Full overview showing net balance, category breakdown ("Spending Art"), daily bu
 flowchart TD
     subgraph Ingestion["1. Ingestion Layer"]
         A1["Android Notification Listener<br/>(Google Pay, Revolut, Banking)"]
-        A2["iOS 17+ Apple Wallet<br/>(Shortcuts Trigger)"]
+        A2["iOS 17+ Apple Wallet<br/>(Shortcuts Automation)"]
         A3["Kore Voice Agent<br/>(Web Speech API / Native Mic)"]
-        A4["Manual UI Modal<br/>(Form Input)"]
+        A4["Manual UI Modal<br/>(Direct Form Input)"]
     end
 
-    subgraph Processing["2. Parsing & AI Pipeline"]
-        B1["Regex & Heuristic Parsers<br/>(Banking Notifications)"]
-        B2["Google Gemini 2.5 / 2.0 API<br/>(Structured JSON Extraction)"]
-        B3["OpenRouter Fallback Router"]
-        B4["ElevenLabs TTS Service"]
+    subgraph Processing["2. Kore Intelligence Engine"]
+        B1["Regex & Heuristic Parsers<br/>(Push Notification Classifier)"]
+        B2["Kore Agent Reasoning Core<br/>(Intent Resolution & Structured Extraction)"]
+        B3["Multi-Model Inference Router<br/>(Local / Cloud LLM Endpoint)"]
+        B4["ElevenLabs TTS Voice Engine"]
     end
 
     subgraph Backend["3. Backend & Storage (Appwrite)"]
-        C1["Appwrite Auth<br/>(User Sessions)"]
+        C1["Appwrite Auth<br/>(User Sessions & Access Control)"]
         C2["Appwrite Database<br/>(Transactions Collection)"]
         C3["Appwrite Storage<br/>(Dynamic Wallpapers Bucket)"]
-        C4["Capacitor Preferences<br/>(Offline Queue & Settings)"]
+        C4["Capacitor Preferences<br/>(Offline Queue & Local Cache)"]
     end
 
     subgraph UI["4. Presentation Layer"]
@@ -138,8 +139,8 @@ flowchart TD
     A1 --> B1
     A2 --> D1
     A3 --> B2
-    B2 -. fallback .-> B3
-    B2 -. response voice .-> B4
+    B2 -. reasoning inference .-> B3
+    B2 -. auditory response .-> B4
     A4 --> D1
 
     B1 --> C2
@@ -162,15 +163,15 @@ flowchart TD
 
 | Layer | Technology | Function |
 |:---|:---|:---|
-| **Frontend Framework** | [React 19](https://react.dev/) | Component hierarchy, state management, and virtual DOM reconciliation |
-| **Build Tool** | [Vite 6](https://vitejs.dev/) | Fast HMR dev server and optimized production bundler |
+| **Personal AI Agent** | **Kore Intelligence Runtime** | Autonomous personal financial agent, conversational auditing, and structured entity extraction (pluggable LLM inference) |
+| **Frontend Framework** | [React 19](https://react.dev/) | Component architecture, state management, and virtual DOM reconciliation |
+| **Build Tool** | [Vite 6](https://vitejs.dev/) | High-speed HMR dev server and optimized production bundler |
 | **Styling** | [Tailwind CSS 3.4](https://tailwindcss.com/) | Utility-first glassmorphism, responsive grid layouts, and dark mode |
-| **Animations** | [Framer Motion 12](https://www.framer.com/motion/) | Modals, transitions, and dynamic voice orb visualizer |
+| **Animations** | [Framer Motion 12](https://www.framer.com/motion/) | UI transitions and dynamic acoustic cloud visualizer |
 | **Charts & Forecasts** | [Recharts 3.5](https://recharts.org/) | Linear cash flow projections and category distribution donut charts |
-| **Backend as a Service** | [Appwrite 21](https://appwrite.io/) | User authentication, database documents, and storage buckets |
-| **AI Extraction** | [Google Gemini API](https://ai.google.dev/) | Primary LLM for natural language voice parsing and financial queries |
-| **Mobile Runtime** | [Capacitor 8](https://capacitorjs.com/) | Native Android runtime, notification listener, and local preferences |
-| **Voice Synthesis** | [ElevenLabs API](https://elevenlabs.io/) | Optional conversational text-to-speech audio feedback |
+| **Backend as a Service** | [Appwrite 21](https://appwrite.io/) | User authentication, document database, and file storage |
+| **Mobile Runtime** | [Capacitor 8](https://capacitorjs.com/) | Native Android runtime, background notification listener, and preferences |
+| **Voice Synthesis** | [ElevenLabs API](https://elevenlabs.io/) | Optional conversational spoken voice feedback |
 | **Export Engines** | [jsPDF](https://github.com/parallax/jsPDF) & [FileSaver](https://github.com/eligrey/FileSaver.js) | Client-side generation of PDF audit tables and CSV spreadsheets |
 
 ---
@@ -181,7 +182,7 @@ flowchart TD
 - **Node.js**: v18.0.0 or higher
 - **npm** or **pnpm**
 - **Appwrite Instance**: Cloud ([cloud.appwrite.io](https://cloud.appwrite.io)) or self-hosted
-- **Google Gemini API Key**: Obtainable from [Google AI Studio](https://aistudio.google.com/)
+- **Agent Inference Key**: An API key powering the agent's neural reasoning backend (configured via `GEMINI_API_KEY` or `OPENROUTER_API_KEY`)
 
 ### Local Installation
 
@@ -201,14 +202,14 @@ flowchart TD
    ```bash
    cp .env.example .env
    ```
-   Populate `.env` with your Appwrite project credentials and Gemini API key:
+   Populate `.env` with your Appwrite project credentials and inference backend key:
    ```env
    VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
    VITE_APPWRITE_PROJECT_ID=your_project_id
    VITE_APPWRITE_DATABASE_ID=your_database_id
    VITE_APPWRITE_COLLECTION_ID=transaction
    VITE_APPWRITE_WALLPAPER_BUCKET_ID=your_storage_bucket_id
-   GEMINI_API_KEY=your_gemini_api_key
+   GEMINI_API_KEY=your_inference_api_key
    ```
 
 4. **Start the local development server:**
@@ -286,10 +287,10 @@ Kore is configured with `vite-plugin-pwa` for offline caching and home-screen in
 | `VITE_APPWRITE_DATABASE_ID` | **Yes** | Database ID containing financial collections |
 | `VITE_APPWRITE_COLLECTION_ID` | **Yes** | Collection ID for transactions (e.g., `transaction`) |
 | `VITE_APPWRITE_WALLPAPER_BUCKET_ID`| **Yes** | Storage Bucket ID for background wallpapers |
-| `GEMINI_API_KEY` | **Yes** | Google Gemini API key used for voice parsing and intelligence |
+| `GEMINI_API_KEY` | **Yes** | Primary API key powering the Kore Agent's neural reasoning engine |
 | `OPENROUTER_API_KEY` | No | Optional secondary LLM fallback key |
 | `VITE_ELEVENLABS_VOICE_ID` | No | Voice ID for ElevenLabs speech synthesis |
-| `VITE_APPWRITE_FUNCTION_ID_GEMINI` | No | Optional Appwrite Cloud Function ID for server-side AI execution |
+| `VITE_APPWRITE_FUNCTION_ID_GEMINI` | No | Optional Appwrite Cloud Function ID for server-side agent execution |
 | `VITE_APPWRITE_FUNCTION_ID_ELEVENLABS` | No | Optional Appwrite Cloud Function ID for audio synthesis |
 
 ---
