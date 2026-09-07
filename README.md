@@ -283,8 +283,6 @@ Kore is configured with `vite-plugin-pwa` for offline caching and home-screen in
 Detailed architectural notes and integration guides are available in the repository:
 - [CODEBASE_EXPLANATION.md](CODEBASE_EXPLANATION.md) — Comprehensive deep dive into context providers, component architecture, and data flow.
 - [GOOGLE_AND_APPLE_PAY_TRACKER_GUIDE.md](GOOGLE_AND_APPLE_PAY_TRACKER_GUIDE.md) — Technical instructions for Android Notification Access and iOS 17 Apple Wallet integration.
-- [OS_SHORTCUTS_GUIDE.md](OS_SHORTCUTS_GUIDE.md) — Native OS shortcuts setup for Siri, Android Assistant, and the Action Button.
-- [ANDROID_PLAYSTORE_LAUNCH_PLAN.md](ANDROID_PLAYSTORE_LAUNCH_PLAN.md) — Production release and verification plan for Android APK distribution.
 
 ---
 
