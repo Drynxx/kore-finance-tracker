@@ -1,0 +1,270 @@
+================================================================================
+          KORE FINANCE TRACKER - ANDROID & JAVA ARCHITECTURE EXPLANATION
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. Executive Overview: What Was Built & Why
+2. Why We Use Java in a React Web Application
+3. The Communication Bridge: How JavaScript & Java Talk to Each Other
+4. Breakdown of Each Java Component
+   4.1 MainActivity.java (The Android Entry Point)
+   4.2 PaymentNotificationService.java (Background Google Pay Tracker)
+   4.3 PaymentTrackerPlugin.java (Bridge for Payment Settings & Sync)
+   4.4 NativeSpeechPlugin.java (Android Native Voice Recognizer)
+5. How Apple Pay Is Handled (iOS vs Android)
+6. Fixes Implemented Along the Way (Blank Screen, Node 22, Error Boundaries)
+7. Summary Flow Diagrams
+
+
+================================================================================
+1. EXECUTIVE OVERVIEW: WHAT WAS BUILT & WHY
+================================================================================
+
+Kore started as a React 19 + Vite web application (PWA). While web apps are 
+great for UI and cloud databases, mobile operating systems (Android & iOS) enforce
+strict security sandboxes that prevent any normal website from:
+  - Reading notifications from Google Pay, Google Wallet, or banking apps.
+  - Running continuous background services when the app is minimized or closed.
+  - Directly controlling native hardware like the Android speech engine without
+    browser prompts and limitations.
+
+To overcome these barriers without rewriting your entire React codebase from 
+scratch in Kotlin or Flutter, we wrapped the application in Capacitor. 
+This gave us a full, production-ready Android Studio project located in the 
+`android/` folder, allowing us to write native Java code that hooks directly into 
+Android OS system services.
+
+
+================================================================================
+2. WHY WE USE JAVA IN THIS PROJECT
+================================================================================
+
+Browsers and WebViews live in an isolated sandbox. A JavaScript script running in
+React cannot execute system-level Android calls. For example:
+  - There is NO JavaScript API to listen to other apps' notifications.
+  - There is NO Web Speech API in Android WebViews (Google disables it inside
+    third-party WebViews).
+
+Java is the official, native language of Android runtime services. By writing 
+native Java classes inside `android/app/src/main/java/com/kore/financetracker/`:
+  1. We access Android System Services:
+     - NotificationListenerService (intercepts Google Pay alerts)
+     - NotificationManager (creates heads-up confirmation banners)
+     - SpeechRecognizer (on-device & cloud speech-to-text)
+     - SharedPreferences (encrypted persistent native storage)
+  2. We expose these native Java powers directly to your React components as 
+     standard async JavaScript functions.
+
+
+================================================================================
+3. THE COMMUNICATION BRIDGE: HOW JAVASCRIPT & JAVA TALK
+================================================================================
+
+Capacitor creates a two-way asynchronous JSON bridge between React and Java:
+
+   ┌────────────────────────────────────────────────────────┐
+   │               React 19 Frontend (JavaScript)           │
+   │  - KoreAIContainer.jsx / QuickLogHandler.jsx           │
+   │  - SettingsModal.jsx / TransactionContext.jsx          │
+   └───────────────────────────┬────────────────────────────┘
+                               │
+                      Calls Plugin Methods
+                      & Listens for Events
+                               │
+   ┌───────────────────────────▼────────────────────────────┐
+   │                  Capacitor Bridge Layer                │
+   │  (Translates JS Promises <──> Java PluginCalls & JSON) │
+   └───────────────────────────┬────────────────────────────┘
+                               │
+   ┌───────────────────────────▼────────────────────────────┐
+   │               Native Java Code (android/app)           │
+   │  - PaymentTrackerPlugin.java                           │
+   │  - NativeSpeechPlugin.java                             │
+   │  - PaymentNotificationService.java                     │
+   └───────────────────────────┬────────────────────────────┘
+                               │
+   ┌───────────────────────────▼────────────────────────────┐
+   │                   Android Operating System             │
+   │  - Android Notification Bar & Google Pay               │
+   │  - Android Microphone & SpeechRecognizer Hardware      │
+   │  - Appwrite Cloud REST API (via HTTP Background)       │
+   └────────────────────────────────────────────────────────┘
+
+
+================================================================================
+4. BREAKDOWN OF EACH JAVA COMPONENT
+================================================================================
+
+--------------------------------------------------------------------------------
+4.1 MainActivity.java
+File: android/app/src/main/java/com/kore/financetracker/MainActivity.java
+--------------------------------------------------------------------------------
+What it does:
+  - It is the root Activity that Android launches when you tap the Kore icon.
+  - It extends `BridgeActivity` (provided by Capacitor).
+  - In its `onCreate()` method, it registers our custom Java plugins:
+      registerPlugin(PaymentTrackerPlugin.class);
+      registerPlugin(NativeSpeechPlugin.class);
+  - This tells Capacitor: "When JavaScript asks for 'PaymentTracker' or 
+    'NativeSpeech', route those requests to our custom Java classes."
+
+
+--------------------------------------------------------------------------------
+4.2 PaymentNotificationService.java (Google Pay Background Tracker)
+File: android/app/src/main/java/com/kore/financetracker/PaymentNotificationService.java
+--------------------------------------------------------------------------------
+What it does:
+  - Extends Android's native `NotificationListenerService`.
+  - Runs in the background independently of the React UI (even when the app is 
+    minimized, swiped away, or the phone screen is locked).
+
+How the tracking pipeline works step-by-step:
+  1. System Event: Whenever ANY app posts a notification, Android calls:
+     `onNotificationPosted(StatusBarNotification sbn)`
+  2. Filter Target Apps: The Java service inspects `sbn.getPackageName()`:
+     - Google Wallet / Google Pay: `com.google.android.apps.walletnfcrel`
+     - Google Play Services: `com.google.android.gms`
+     - Banking apps: `com.revolut.revolut`, `com.transferwise.android`,
+       `com.monzo.android`, `ro.btrl.btpay`, `com.ing.mobile`, etc.
+  3. Extract Content: Java extracts the title, subtitle, and big text from 
+     Android Notification Extras (e.g. "You paid $14.50 to Starbucks").
+  4. Deduplication: Keeps an in-memory 60-second cache so duplicate notifications 
+     for the same transaction don't log twice.
+  5. Intelligent Parser:
+     - Uses regular expressions to extract amount ($14.50, 45.00 RON, €12.99).
+     - Extracts the merchant name ("to Starbucks", "at Mega Image").
+     - Auto-categorizes into Food & Dining, Groceries, Transportation, 
+       Shopping, Entertainment, or Utilities.
+  6. Multi-Layer Persistence:
+     - Writes transaction to native `SharedPreferences` (offline safety queue).
+     - Dispatches a background Java HTTP thread directly to Appwrite's REST API
+       (`POST /databases/[DB]/collections/[COL]/documents`) using stored user 
+       credentials.
+     - If the app happens to be open, it fires an event to React so the UI updates
+       in real time.
+  7. Instant Confirmation Notification:
+     - Java builds an Android `NotificationCompat` with high importance:
+       Title: "✅ Logged: -$14.50"
+       Text:  "Starbucks (Food & Dining) • Auto-added to Kore"
+     - Tapping the notification brings you directly into Kore.
+
+
+--------------------------------------------------------------------------------
+4.3 PaymentTrackerPlugin.java (The Bridge for Settings & Sync)
+File: android/app/src/main/java/com/kore/financetracker/PaymentTrackerPlugin.java
+--------------------------------------------------------------------------------
+What it does:
+  - Decorated with `@CapacitorPlugin(name = "PaymentTracker")`.
+  - Exposes control methods to React:
+    * `isPermissionGranted()`: Checks if the user enabled "Notification Access" 
+      in Android system settings.
+    * `openPermissionSettings()`: Fires an Android Intent to take the user directly 
+      to Android Settings -> Device & App Notifications to enable Kore.
+    * `syncSession()`: React passes the user's Appwrite endpoint, database ID, and 
+      user ID to Java, which stores them in Android `SharedPreferences` so the 
+      background service can log expenses when the app is closed.
+    * `getPendingTransactions()`: Flushes any transactions that were captured in 
+      the background while the app was asleep.
+    * `simulateNotification()`: Allows developer/user testing with 1-click in the 
+      Settings -> Auto-Pay tab without needing a real Google Pay purchase.
+
+
+--------------------------------------------------------------------------------
+4.4 NativeSpeechPlugin.java (Android Native Speech Recognizer)
+File: android/app/src/main/java/com/kore/financetracker/NativeSpeechPlugin.java
+--------------------------------------------------------------------------------
+What it does:
+  - Solves the problem where Web Speech API (`webkitSpeechRecognition`) is 
+    completely disabled inside Android WebViews.
+  - Wraps Android's native `android.speech.SpeechRecognizer` hardware engine.
+
+How it works:
+  1. Permission Request: When speech starts, Java checks if `RECORD_AUDIO` is 
+     granted. If not, it triggers Android's system popup asking the user for 
+     microphone permission.
+  2. SpeechRecognizer Initialization: Runs on Android's Main UI thread.
+  3. Real-Time Event Listening:
+     - `onReadyForSpeech`: Emits `{ isListening: true }` to React.
+     - `onPartialResults`: Streams partial words as you speak so the Kore UI 
+       visualizes your speech live!
+     - `onResults`: Captures the finalized sentence, sends `{ transcript, isFinal: true }` 
+       to React, and triggers Gemini AI reasoning.
+     - `onError`: Catches timeouts, audio issues, or network drops cleanly.
+  4. Language Support: Accepts language codes like `ro-RO` (Romanian), `en-US` 
+     (English), etc., configuring the native Google speech model accordingly.
+
+
+================================================================================
+5. HOW APPLE PAY IS HANDLED (iOS vs ANDROID)
+================================================================================
+
+Why doesn't iOS use the same notification listener service as Android?
+  - Apple's iOS security model strictly forbids ANY third-party application 
+    from inspecting or intercepting notifications from Apple Pay or any other app.
+  - There is NO `NotificationListenerService` on iOS.
+
+The Official Apple Solution (iOS 17+ Wallet Automations):
+  - In iOS 17+, Apple introduced a native trigger in the **Shortcuts** app:
+    "Transaction" (When any card is used with Apple Pay).
+  - We configured Kore with custom URL protocols: `web+kore://log?text=...`.
+  - When you pay via Apple Pay on iPhone:
+    1. iOS detects the tap-to-pay transaction.
+    2. Apple Shortcut runs automatically with "Run Immediately".
+    3. The shortcut passes the amount, currency, and merchant into Kore via the 
+       deep-link scheme or webhook.
+    4. Kore auto-logs and confirms the expense!
+
+
+================================================================================
+6. FIXES IMPLEMENTED ALONG THE WAY
+================================================================================
+
+1. Blank/Black Screen on Launch:
+   - Root Cause: In CI (GitHub Actions), `.env` was ignored by `.gitignore`.
+     Appwrite's SDK received `undefined` for `setEndpoint()`, which threw 
+     `TypeError: Cannot read properties of undefined (reading 'startsWith')` 
+     during initial script execution before React could mount.
+   - Solution: Added hardcoded fallback defaults in `src/lib/appwrite.js` and 
+     passed environment variables explicitly in `.github/workflows/build-apk.yml`.
+   - Added `src/components/ErrorBoundary.jsx` so unhandled errors display a 
+     graceful recovery screen instead of a blank page.
+   - Set `base: './'` in `vite.config.js` to ensure all asset paths in Android 
+     WebView resolve relatively without root-path assumptions.
+
+2. Capacitor CLI Node 22 Requirement:
+   - Upgraded GitHub Actions runner from Node 20 to Node 22 LTS to satisfy 
+     Capacitor 8.5+ requirements.
+   - Upgraded `actions/setup-java` to v5 with Gradle build caching.
+
+3. Voice Assistant on APK:
+   - Android WebView does not expose `window.webkitSpeechRecognition`.
+   - Created `NativeSpeechPlugin.java` using `android.speech.SpeechRecognizer`.
+   - Added `RECORD_AUDIO` and `MODIFY_AUDIO_SETTINGS` to `AndroidManifest.xml`.
+   - Added `<queries>` tag for `android.speech.RecognitionService` (required for 
+     Android 11+).
+   - Updated `src/hooks/useSpeechRecognition.js` to automatically switch between 
+     native Android speech and browser speech.
+
+
+================================================================================
+7. ARCHITECTURE SUMMARY CHEATSHEET
+================================================================================
+
+Android APK Directory Structure:
+android/app/src/main/
+├── AndroidManifest.xml          <- Permissions (RECORD_AUDIO, NOTIFICATIONS)
+├── assets/public/               <- Compiled React Web Bundle (HTML, JS, CSS)
+└── java/com/kore/financetracker/
+    ├── MainActivity.java        <- Registers plugins into Capacitor bridge
+    ├── PaymentNotificationService.java <- Intercepts Google Pay alerts in background
+    ├── PaymentTrackerPlugin.java       <- Communicates payment data with React
+    └── NativeSpeechPlugin.java         <- Direct Android microphone speech recognizer
+
+Frontend Integration:
+src/
+├── services/paymentTracker.js   <- JS API for PaymentTrackerPlugin
+├── hooks/useSpeechRecognition.js<- Hybrid voice hook (Native on APK, Web on Chrome)
+├── components/SettingsModal.jsx <- UI for Auto-Pay permissions and Apple Shortcuts
+├── context/TransactionContext.jsx <- Syncs background transactions on app open
+└── components/ErrorBoundary.jsx <- Prevents any blank-screen crash on startup
