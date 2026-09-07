@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { X, Settings, Image as ImageIcon, DollarSign, User, LogOut, Check, RefreshCw, FileText, FileDown, ChevronRight, SwitchCamera, Zap, Bell, Smartphone, Copy, ExternalLink } from 'lucide-react';
+import { X, Settings, Image as ImageIcon, DollarSign, User, LogOut, Check, RefreshCw, FileText, FileDown, ChevronRight, SwitchCamera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useWallpaper } from '../context/WallpaperContext';
@@ -7,21 +7,17 @@ import { TransactionContext } from '../context/TransactionContext';
 import { storage, WALLPAPER_BUCKET_ID } from '../lib/appwrite';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExportButtons } from './ExportButtons';
-import { AutoPayModal } from './AutoPayModal';
 
 const SettingsModal = ({ onClose }) => {
-    const { user, logout, ingestionKey, getWebhookUrl } = useAuth();
+    const { user, logout } = useAuth();
     const { currency, changeCurrency, currencies } = useCurrency();
     const { wallpapers, selectWallpaper, isAutoRotating, toggleAutoRotation, wallpaperUrl } = useWallpaper();
     const { transactions } = useContext(TransactionContext);
     const [activeTab, setActiveTab] = useState('appearance');
-    const [isAutoPayModalOpen, setIsAutoPayModalOpen] = useState(false);
-    const [copied, setCopied] = useState(false);
 
     const tabs = [
         { id: 'appearance', label: 'Appearance', icon: ImageIcon, desc: 'Wallpaper & Theme' },
         { id: 'general', label: 'General', icon: Settings, desc: 'Currency & Data' },
-        { id: 'autopay', label: 'Auto-Pay', icon: Zap, desc: 'Google & Apple Pay' },
         { id: 'account', label: 'Account', icon: User, desc: 'Profile & Security' },
     ];
 
@@ -214,112 +210,6 @@ const SettingsModal = ({ onClose }) => {
                                 </div>
                             )}
 
-                            {/* Auto-Pay Tab */}
-                            {activeTab === 'autopay' && (
-                                <div className="space-y-6 md:space-y-8">
-                                    <section className="space-y-3 md:space-y-4">
-                                        <h4 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wider pl-1">
-                                            Automated Payment Ingestion
-                                        </h4>
-                                        <div className="bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-purple-950/40 border border-indigo-500/20 rounded-2xl p-5 space-y-4">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <h5 className="text-sm md:text-base font-bold text-white flex items-center gap-2">
-                                                        <Zap size={18} className="text-indigo-400" />
-                                                        <span>Google Pay &amp; Apple Pay Sync</span>
-                                                    </h5>
-                                                    <p className="text-xs md:text-sm text-slate-300 mt-1 leading-relaxed">
-                                                        Automatically capture incoming payment notifications from Google Wallet or Apple Pay and confirm with real-time notifications.
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => setIsAutoPayModalOpen(true)}
-                                                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 shrink-0 transition-all flex items-center gap-1.5"
-                                                >
-                                                    <span>Open Setup &amp; Sandbox</span>
-                                                    <ExternalLink size={13} />
-                                                </button>
-                                            </div>
-
-                                            {/* Sync Token Preview */}
-                                            <div className="pt-2 border-t border-white/5 space-y-2">
-                                                <div className="flex items-center justify-between text-xs">
-                                                    <span className="text-slate-400">Personal Webhook URL</span>
-                                                    <button
-                                                        onClick={() => {
-                                                            const url = `${getWebhookUrl()}?apiKey=${ingestionKey}`;
-                                                            navigator.clipboard.writeText(url);
-                                                            setCopied(true);
-                                                            setTimeout(() => setCopied(false), 2000);
-                                                        }}
-                                                        className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium text-xs transition-colors"
-                                                    >
-                                                        {copied ? (
-                                                            <>
-                                                                <Check size={13} className="text-emerald-400" />
-                                                                <span className="text-emerald-400">Copied</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Copy size={13} />
-                                                                <span>Copy Webhook</span>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </div>
-                                                <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 font-mono text-[11px] text-slate-300 truncate">
-                                                    {getWebhookUrl()}?apiKey={ingestionKey}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </section>
-
-                                    {/* Supported Platforms Grid */}
-                                    <section className="space-y-3 md:space-y-4">
-                                        <h4 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wider pl-1">
-                                            Supported Platforms
-                                        </h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <div 
-                                                onClick={() => setIsAutoPayModalOpen(true)}
-                                                className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-indigo-500/30 transition-all cursor-pointer group"
-                                            >
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <div className="flex items-center gap-2 text-white font-semibold text-sm">
-                                                        <Smartphone size={16} className="text-indigo-400" />
-                                                        <span>Apple Pay (iOS)</span>
-                                                    </div>
-                                                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-medium">
-                                                        Shortcuts
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-slate-400">
-                                                    100% background automation via iOS 17+ Wallet Transaction triggers.
-                                                </p>
-                                            </div>
-
-                                            <div 
-                                                onClick={() => setIsAutoPayModalOpen(true)}
-                                                className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-indigo-500/30 transition-all cursor-pointer group"
-                                            >
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <div className="flex items-center gap-2 text-white font-semibold text-sm">
-                                                        <Smartphone size={16} className="text-emerald-400" />
-                                                        <span>Google Pay (Android)</span>
-                                                    </div>
-                                                    <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 font-medium">
-                                                        MacroDroid
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-slate-400">
-                                                    Listens to Google Wallet notifications and posts to Kore automatically.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </section>
-                                </div>
-                            )}
-
                             {/* Account Tab */}
                             {activeTab === 'account' && (
                                 <div className="space-y-6 md:space-y-8">
@@ -359,11 +249,6 @@ const SettingsModal = ({ onClose }) => {
                     </AnimatePresence>
                 </div>
             </motion.div>
-
-            {/* Nested AutoPay Modal (When opened from Settings) */}
-            {isAutoPayModalOpen && (
-                <AutoPayModal onClose={() => setIsAutoPayModalOpen(false)} />
-            )}
         </div>
     );
 };

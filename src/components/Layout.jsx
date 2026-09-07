@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Plus, List, Wallet, Settings, Bot, Zap } from 'lucide-react';
+import { LayoutDashboard, Plus, List, Wallet, Settings, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SettingsModal } from './SettingsModal';
 import { AIAssistantModal } from './AIAssistantModal';
-import { AutoPayModal } from './AutoPayModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import IntroAnimation from './IntroAnimation';
 
@@ -11,7 +10,6 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
     const { user } = useAuth();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isAIOpen, setIsAIOpen] = useState(false);
-    const [isAutoPayOpen, setIsAutoPayOpen] = useState(false);
     const [showIntro, setShowIntro] = useState(false);
 
     useEffect(() => {
@@ -88,12 +86,6 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                             onClick={() => setIsAIOpen(true)}
                         />
                         <DockIcon
-                            icon={Zap}
-                            label="Auto-Pay Tracking"
-                            isActive={isAutoPayOpen}
-                            onClick={() => setIsAutoPayOpen(true)}
-                        />
-                        <DockIcon
                             icon={Settings}
                             label="Settings"
                             isActive={isSettingsOpen}
@@ -130,14 +122,8 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
                         {user?.name?.charAt(0) || 'U'}
                     </div>
 
-                    {/* Right Side - Auto-Pay Tracking Quick Access */}
-                    <button
-                        onClick={() => setIsAutoPayOpen(true)}
-                        className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-indigo-400 hover:text-white transition-colors border border-white/5 shadow-md shadow-indigo-500/20"
-                        title="Auto-Pay Tracking"
-                    >
-                        <Zap size={16} className="text-indigo-400 animate-pulse" />
-                    </button>
+                    {/* Right Side - Empty for balance */}
+                    <div className="w-8 h-8" />
                 </div>
             </header>
 
@@ -209,11 +195,6 @@ const Layout = ({ children, activeTab, setActiveTab, onOpenAddModal }) => {
             {/* AI Assistant Modal */}
             {isAIOpen && (
                 <AIAssistantModal onClose={() => setIsAIOpen(false)} />
-            )}
-
-            {/* Auto-Pay Tracking Modal */}
-            {isAutoPayOpen && (
-                <AutoPayModal onClose={() => setIsAutoPayOpen(false)} />
             )}
 
             <AnimatePresence>
