@@ -278,23 +278,6 @@ Kore is configured with `vite-plugin-pwa` for offline caching and home-screen in
 
 ---
 
-## Configuration Reference
-
-| Environment Variable | Required | Default / Description |
-|:---|:---:|:---|
-| `VITE_APPWRITE_ENDPOINT` | **Yes** | Appwrite API endpoint (e.g., `https://cloud.appwrite.io/v1`) |
-| `VITE_APPWRITE_PROJECT_ID` | **Yes** | Your Appwrite project identifier |
-| `VITE_APPWRITE_DATABASE_ID` | **Yes** | Database ID containing financial collections |
-| `VITE_APPWRITE_COLLECTION_ID` | **Yes** | Collection ID for transactions (e.g., `transaction`) |
-| `VITE_APPWRITE_WALLPAPER_BUCKET_ID`| **Yes** | Storage Bucket ID for background wallpapers |
-| `GEMINI_API_KEY` | **Yes** | Primary API key powering the Kore Agent's neural reasoning engine |
-| `OPENROUTER_API_KEY` | No | Optional secondary LLM fallback key |
-| `VITE_ELEVENLABS_VOICE_ID` | No | Voice ID for ElevenLabs speech synthesis |
-| `VITE_APPWRITE_FUNCTION_ID_GEMINI` | No | Optional Appwrite Cloud Function ID for server-side agent execution |
-| `VITE_APPWRITE_FUNCTION_ID_ELEVENLABS` | No | Optional Appwrite Cloud Function ID for audio synthesis |
-
----
-
 ## Project Documentation
 
 Detailed architectural notes and integration guides are available in the repository:
