@@ -11,6 +11,11 @@ import {
     getNextMonthKey,
     getDaysElapsedInMonth
 } from '../utils/date';
+import {
+    syncPaymentTrackerSession,
+    fetchPendingTransactions,
+    addPaymentDetectedListener
+} from '../services/paymentTracker';
 
 export const TransactionContext = createContext();
 
@@ -23,10 +28,55 @@ export const TransactionProvider = ({ children }) => {
     const currentMonthKey = getCurrentMonthKey();
     const isCurrentMonth = selectedMonth === currentMonthKey;
 
-    // Load transactions from Appwrite when user changes
+    // Load transactions from Appwrite and sync background tracker when user changes
     useEffect(() => {
         if (user) {
             loadTransactions();
+            syncPaymentTrackerSession(user);
+
+            // Fetch any transactions collected by Android service while app was in background
+            const checkPending = async () => {
+                try {
+                    const pending = await fetchPendingTransactions();
+                    if (pending && pending.length > 0) {
+                        for (const item of pending) {
+                            await addTransaction({
+                                type: item.type || 'expense',
+                                amount: item.amount,
+                                category: item.category || 'General',
+                                date: item.date || new Date().toISOString(),
+                                note: item.note || `Auto-tracked from ${item.merchant || 'Google Pay'}`
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error syncing pending payment notifications:', e);
+                }
+            };
+            checkPending();
+
+            // Listen for live payment notifications arriving while the app is foregrounded
+            const listener = addPaymentDetectedListener((newTx) => {
+                if (newTx && newTx.amount) {
+                    setTransactions((prev) => {
+                        if (prev.some(t => t.id === newTx.id)) return prev;
+                        return [{
+                            id: newTx.id || String(Date.now()),
+                            type: 'expense',
+                            amount: newTx.amount,
+                            category: newTx.category || 'General',
+                            date: newTx.date || new Date().toISOString(),
+                            note: newTx.note || `Auto-tracked: ${newTx.merchant}`
+                        }, ...prev];
+                    });
+                }
+            });
+
+            return () => {
+                if (listener && typeof listener.remove === 'function') {
+                    listener.remove();
+                }
+            };
         } else {
             setTransactions([]);
             setLoading(false);

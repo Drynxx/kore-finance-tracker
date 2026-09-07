@@ -1,5 +1,5 @@
-import React, { useState, useContext } from 'react';
-import { X, Settings, Image as ImageIcon, DollarSign, User, LogOut, Check, RefreshCw, FileText, FileDown, ChevronRight, SwitchCamera } from 'lucide-react';
+import React, { useState, useEffect, useContext } from 'react';
+import { X, Settings, Image as ImageIcon, DollarSign, User, LogOut, Check, RefreshCw, FileText, FileDown, ChevronRight, SwitchCamera, Zap, Bell, ShieldCheck, Smartphone, Sparkles, ExternalLink, CheckCircle2, Copy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useWallpaper } from '../context/WallpaperContext';
@@ -7,17 +7,62 @@ import { TransactionContext } from '../context/TransactionContext';
 import { storage, WALLPAPER_BUCKET_ID } from '../lib/appwrite';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExportButtons } from './ExportButtons';
+import { checkPaymentNotificationPermission, openNotificationSettings, testSimulatePayment, isNativeAndroid } from '../services/paymentTracker';
 
 const SettingsModal = ({ onClose }) => {
     const { user, logout } = useAuth();
     const { currency, changeCurrency, currencies } = useCurrency();
     const { wallpapers, selectWallpaper, isAutoRotating, toggleAutoRotation, wallpaperUrl } = useWallpaper();
-    const { transactions } = useContext(TransactionContext);
+    const { transactions, addTransaction } = useContext(TransactionContext);
     const [activeTab, setActiveTab] = useState('appearance');
+
+    const [permissionGranted, setPermissionGranted] = useState(null);
+    const [simulating, setSimulating] = useState(false);
+    const [simulationSuccess, setSimulationSuccess] = useState(null);
+    const [copiedShortcut, setCopiedShortcut] = useState(false);
+
+    useEffect(() => {
+        if (activeTab === 'tracking') {
+            checkPaymentNotificationPermission().then(res => {
+                setPermissionGranted(res.granted);
+            });
+        }
+    }, [activeTab]);
+
+    const handleSimulate = async () => {
+        setSimulating(true);
+        setSimulationSuccess(null);
+        try {
+            const res = await testSimulatePayment('Google Pay', `Paid ${currency.symbol || '$'}14.50 to Starbucks`);
+            if (res.success && res.transaction) {
+                setSimulationSuccess(res.transaction);
+                if (addTransaction) {
+                    await addTransaction({
+                        type: 'expense',
+                        amount: res.transaction.amount,
+                        category: res.transaction.category || 'Food & Dining',
+                        date: res.transaction.date || new Date().toISOString(),
+                        note: res.transaction.note || 'Test: Auto-tracked from Google Pay'
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Simulation failed:', e);
+        } finally {
+            setSimulating(false);
+        }
+    };
+
+    const handleCopyShortcut = () => {
+        navigator.clipboard.writeText('web+kore://log?text=Spent%20[Amount]%20at%20[Merchant]');
+        setCopiedShortcut(true);
+        setTimeout(() => setCopiedShortcut(false), 2500);
+    };
 
     const tabs = [
         { id: 'appearance', label: 'Appearance', icon: ImageIcon, desc: 'Wallpaper & Theme' },
         { id: 'general', label: 'General', icon: Settings, desc: 'Currency & Data' },
+        { id: 'tracking', label: 'Auto-Pay', icon: Zap, desc: 'Google & Apple Pay' },
         { id: 'account', label: 'Account', icon: User, desc: 'Profile & Security' },
     ];
 
@@ -205,6 +250,138 @@ const SettingsModal = ({ onClose }) => {
                                                 </div>
                                             </div>
                                             <ExportButtons transactions={transactions} />
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
+
+                            {/* Auto-Pay Tracking Tab */}
+                            {activeTab === 'tracking' && (
+                                <div className="space-y-6 md:space-y-8">
+                                    {/* Android / Google Pay Section */}
+                                    <section className="space-y-3 md:space-y-4">
+                                        <div className="flex items-center justify-between pl-1">
+                                            <h4 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                                <Smartphone size={15} className="text-emerald-400" />
+                                                Google Pay & Android Alerts
+                                            </h4>
+                                            {isNativeAndroid ? (
+                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] md:text-xs font-bold border ${permissionGranted
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                                    }`}>
+                                                    {permissionGranted ? '🟢 Active' : '🟡 Permission Required'}
+                                                </span>
+                                            ) : (
+                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] md:text-xs font-bold border bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                                                    APK Native Feature
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 space-y-4">
+                                            <p className="text-xs md:text-sm text-slate-300 leading-relaxed">
+                                                When running as an Android APK, Kore's background <span className="text-indigo-400 font-semibold">NotificationListenerService</span> automatically intercepts notifications from <span className="text-white font-medium">Google Pay, Google Wallet, Revolut, and banking apps</span>, parses the amount & merchant, adds the transaction, and fires an instant confirmation alert.
+                                            </p>
+
+                                            {isNativeAndroid && !permissionGranted && (
+                                                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+                                                    <Bell size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                                                    <div className="space-y-2 flex-1">
+                                                        <p className="text-xs text-amber-200">
+                                                            Android requires one-time authorization to allow Kore to read payment alerts.
+                                                        </p>
+                                                        <button
+                                                            onClick={openNotificationSettings}
+                                                            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all shadow-md"
+                                                        >
+                                                            Enable Notification Access in Settings
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="pt-1 flex flex-col sm:flex-row items-center gap-3">
+                                                <button
+                                                    onClick={handleSimulate}
+                                                    disabled={simulating}
+                                                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 hover:text-white border border-indigo-500/30 transition-all text-xs md:text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10"
+                                                >
+                                                    <Sparkles size={16} className={simulating ? 'animate-spin' : 'text-indigo-400'} />
+                                                    {simulating ? 'Simulating...' : 'Test Google Pay Notification'}
+                                                </button>
+                                            </div>
+
+                                            {simulationSuccess && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 5 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1"
+                                                >
+                                                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                                                        <CheckCircle2 size={16} />
+                                                        Transaction Captured & Saved!
+                                                    </div>
+                                                    <p className="text-xs text-slate-300">
+                                                        Logged <span className="text-white font-semibold">{currency.symbol || '$'}{simulationSuccess.amount}</span> at <span className="text-white font-semibold">{simulationSuccess.merchant}</span> ({simulationSuccess.category}).
+                                                    </p>
+                                                </motion.div>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    {/* Apple Pay / iOS Section */}
+                                    <section className="space-y-3 md:space-y-4">
+                                        <div className="flex items-center justify-between pl-1">
+                                            <h4 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                                <Zap size={15} className="text-indigo-400" />
+                                                Apple Pay & iOS Automations
+                                            </h4>
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] md:text-xs font-bold border bg-purple-500/10 text-purple-400 border-purple-500/20">
+                                                iOS 17+ Supported
+                                            </span>
+                                        </div>
+
+                                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 space-y-4">
+                                            <p className="text-xs md:text-sm text-slate-300 leading-relaxed">
+                                                Due to Apple's strict privacy sandbox, iOS does not permit apps to read system notifications. However, <span className="text-white font-medium">iOS 17+</span> has a native <span className="text-indigo-400 font-semibold">Wallet Transaction Automation</span> that triggers instantly whenever you pay with Apple Pay.
+                                            </p>
+
+                                            <div className="space-y-2 text-xs text-slate-300 bg-black/20 p-3.5 rounded-xl border border-white/5">
+                                                <div className="flex items-start gap-2.5">
+                                                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</span>
+                                                    <span>Open the native <strong>Shortcuts</strong> app on your iPhone $\rightarrow$ tap <strong>Automation</strong>.</span>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</span>
+                                                    <span>Tap <strong>+</strong> and choose <strong>Transaction</strong> (When any card is used).</span>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">3</span>
+                                                    <span>Add action <strong>Open URLs</strong> and paste the Kore quick-log URL scheme.</span>
+                                                </div>
+                                                <div className="flex items-start gap-2.5">
+                                                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">4</span>
+                                                    <span>Toggle <strong>Run Immediately</strong> to ON. Done!</span>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={handleCopyShortcut}
+                                                className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/10 transition-all text-xs md:text-sm font-medium flex items-center justify-center gap-2"
+                                            >
+                                                {copiedShortcut ? (
+                                                    <>
+                                                        <Check size={16} className="text-emerald-400" />
+                                                        <span>Copied URL Scheme to Clipboard!</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy size={16} className="text-slate-400" />
+                                                        <span>Copy Quick-Log Scheme (<code>web+kore://log?text=...</code>)</span>
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
                                     </section>
                                 </div>
