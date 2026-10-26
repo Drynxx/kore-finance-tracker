@@ -13,7 +13,9 @@ const Dashboard = () => {
         monthlyStats,
         selectedMonth,
         isCurrentMonth,
-        goToCurrentMonth
+        goToCurrentMonth,
+        selectedAccount,
+        setSelectedAccount
     } = useContext(TransactionContext);
 
     const { formatAmount } = useCurrency();
@@ -21,9 +23,10 @@ const Dashboard = () => {
     const isAllTime = selectedMonth === 'all';
     const isPastMonth = !isAllTime && !isCurrentMonth;
 
-    const displayNet = isAllTime ? monthlyStats.allTimeBalance : monthlyStats.monthlyNet;
+    const displayNet = isAllTime ? monthlyStats.totalNetWorth : monthlyStats.monthlyNet;
     const displayIncome = isAllTime ? monthlyStats.allTimeIncome : monthlyStats.monthlyIncome;
     const displayExpense = isAllTime ? monthlyStats.allTimeExpense : monthlyStats.monthlyExpense;
+    const displayInvested = isAllTime ? monthlyStats.investedTotal : monthlyStats.monthlyInvested;
 
     // Animation variants
     const container = {
@@ -64,6 +67,119 @@ const Dashboard = () => {
                 {/* Period Selector Controls */}
                 <div className="flex items-center gap-1 flex-shrink-0">
                     <MonthSelector />
+                </div>
+            </motion.div>
+
+            {/* Asset Allocation & Pocket Cash Breakdown Bar */}
+            <motion.div
+                variants={item}
+                className="bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-4 sm:p-5 shadow-xl shadow-black/20 relative overflow-hidden"
+            >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                        <Wallet size={16} className="text-indigo-400" />
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Asset Allocation</span>
+                        <span className="hidden sm:inline text-slate-500">•</span>
+                        <span className="text-xs text-slate-400 font-medium">
+                            Net Worth: <strong className="text-white font-semibold">{formatAmount(monthlyStats.totalNetWorth)}</strong>
+                        </span>
+                    </div>
+                    {selectedAccount && selectedAccount !== 'all' && (
+                        <button
+                            onClick={() => setSelectedAccount('all')}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors self-start sm:self-auto"
+                        >
+                            <RotateCcw size={11} /> Reset Filter
+                        </button>
+                    )}
+                </div>
+
+                {/* Visual Tripartite Allocation Bar */}
+                <div className="w-full h-2 rounded-full bg-white/5 flex overflow-hidden gap-1 mb-3.5 p-0.5">
+                    <div
+                        className="h-full rounded-full bg-blue-500/90 transition-all duration-500"
+                        style={{ width: `${Math.max(monthlyStats.bankPercent, monthlyStats.totalNetWorth > 0 ? 3 : 33)}%` }}
+                        title={`Bank: ${monthlyStats.bankPercent}%`}
+                    />
+                    <div
+                        className="h-full rounded-full bg-emerald-500/90 transition-all duration-500"
+                        style={{ width: `${Math.max(monthlyStats.cashPercent, monthlyStats.totalNetWorth > 0 ? 3 : 33)}%` }}
+                        title={`Pocket Cash: ${monthlyStats.cashPercent}%`}
+                    />
+                    <div
+                        className="h-full rounded-full bg-indigo-500/90 transition-all duration-500"
+                        style={{ width: `${Math.max(monthlyStats.investedPercent, monthlyStats.totalNetWorth > 0 ? 3 : 34)}%` }}
+                        title={`Investments: ${monthlyStats.investedPercent}%`}
+                    />
+                </div>
+
+                {/* Interactive Account Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {/* Bank */}
+                    <button
+                        onClick={() => setSelectedAccount(selectedAccount === 'bank' ? 'all' : 'bank')}
+                        className={`p-3 rounded-2xl border text-left transition-all duration-200 group active:scale-[0.98] ${
+                            selectedAccount === 'bank'
+                                ? 'bg-blue-500/20 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                                : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                            <span className="flex items-center gap-1.5 font-medium text-slate-300">
+                                <span>💳</span> Bank (Card)
+                            </span>
+                            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                                {monthlyStats.bankPercent}%
+                            </span>
+                        </div>
+                        <div className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
+                            {formatAmount(monthlyStats.bankBalance)}
+                        </div>
+                    </button>
+
+                    {/* Pocket Cash */}
+                    <button
+                        onClick={() => setSelectedAccount(selectedAccount === 'cash' ? 'all' : 'cash')}
+                        className={`p-3 rounded-2xl border text-left transition-all duration-200 group active:scale-[0.98] ${
+                            selectedAccount === 'cash'
+                                ? 'bg-emerald-500/20 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                                : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                            <span className="flex items-center gap-1.5 font-medium text-slate-300">
+                                <span>💵</span> Pocket Cash
+                            </span>
+                            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                                {monthlyStats.cashPercent}%
+                            </span>
+                        </div>
+                        <div className="text-base sm:text-lg font-bold text-emerald-300 tracking-tight truncate">
+                            {formatAmount(monthlyStats.cashBalance)}
+                        </div>
+                    </button>
+
+                    {/* Investments */}
+                    <button
+                        onClick={() => setSelectedAccount(selectedAccount === 'investment' ? 'all' : 'investment')}
+                        className={`p-3 rounded-2xl border text-left transition-all duration-200 group active:scale-[0.98] ${
+                            selectedAccount === 'investment'
+                                ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10'
+                                : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                            <span className="flex items-center gap-1.5 font-medium text-slate-300">
+                                <span>📈</span> Investments
+                            </span>
+                            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                                {monthlyStats.investedPercent}%
+                            </span>
+                        </div>
+                        <div className="text-base sm:text-lg font-bold text-indigo-300 tracking-tight truncate">
+                            {formatAmount(monthlyStats.investedTotal)}
+                        </div>
+                    </button>
                 </div>
             </motion.div>
 
@@ -116,7 +232,7 @@ const Dashboard = () => {
                     <div className="relative z-10">
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="text-slate-400 text-xs font-bold tracking-widest uppercase">
-                                {isAllTime ? 'Cumulative Net' : ` Net Balance`}
+                                {isAllTime ? 'Total Net Worth' : `Net Balance`}
                             </h3>
                         </div>
 
@@ -124,21 +240,27 @@ const Dashboard = () => {
                             {formatAmount(displayNet)}
                         </div>
 
-                        {/* All-Time Lifetime Balance Indicator (When viewing a specific month) */}
+                        {/* Net Worth & Liquid Indicator (When viewing a specific month) */}
                         {!isAllTime && (
-                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs">
-                                <span>All-Time Wealth:</span>
-                                <span className="font-medium tracking-tight bg-gradient-to-b from-white to-slate-300 bg-clip-text text-transparent">{formatAmount(monthlyStats.allTimeBalance)}</span>
+                            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs">
+                                    <span>Net Worth:</span>
+                                    <span className="font-semibold text-white">{formatAmount(monthlyStats.totalNetWorth)}</span>
+                                </div>
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs">
+                                    <span>Liquid:</span>
+                                    <span className="font-semibold text-white">{formatAmount(monthlyStats.liquidBalance)}</span>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="relative z-10 grid grid-cols-2 gap-4 mt-8 pt-6">
+                    <div className="relative z-10 grid grid-cols-2 gap-3 mt-8 pt-6 border-t border-white/5">
                         <div>
                             <div className="flex items-center gap-1 text-slate-400 text-xs uppercase tracking-wider mb-1">
                                 <span>Income</span>
                             </div>
-                            <p className="text-lg font-medium text-emerald-400 drop-shadow-sm">
+                            <p className="text-lg font-medium text-emerald-400 drop-shadow-sm truncate">
                                 +{formatAmount(displayIncome)}
                             </p>
                         </div>
@@ -146,10 +268,20 @@ const Dashboard = () => {
                             <div className="flex items-center gap-1 text-slate-400 text-xs uppercase tracking-wider mb-1">
                                 <span>Expense</span>
                             </div>
-                            <p className="text-lg font-medium text-rose-400 drop-shadow-sm">
+                            <p className="text-lg font-medium text-rose-400 drop-shadow-sm truncate">
                                 -{formatAmount(displayExpense)}
                             </p>
                         </div>
+                        {displayInvested > 0 && (
+                            <div className="col-span-2 pt-2 border-t border-white/5 flex items-center justify-between">
+                                <div className="flex items-center gap-1 text-slate-400 text-xs uppercase tracking-wider">
+                                    <span>📈 Invested Capital</span>
+                                </div>
+                                <p className="text-sm font-semibold text-indigo-300 drop-shadow-sm">
+                                    {formatAmount(displayInvested)}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </motion.div>
 

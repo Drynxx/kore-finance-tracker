@@ -19,12 +19,17 @@ export const useVoiceParser = () => {
             const parsedData = await parseVoiceShortcut(rawText.trim());
 
             // Normalization & Validation safeguards
+            const rawType = parsedData.type || 'expense';
+            const safeType = ['income', 'expense', 'investment', 'transfer'].includes(rawType) ? rawType : 'expense';
+            const safeAccount = parsedData.account || (parsedData.paymentMethod === 'Cash' ? 'cash' : 'bank');
+
             const normalized = {
                 amount: Math.abs(parseFloat(parsedData.amount)) || 0,
                 currency: (parsedData.currency || 'RON').toUpperCase(),
-                category: parsedData.category || 'Other',
-                paymentMethod: parsedData.paymentMethod === 'Card' ? 'Card' : 'Cash',
-                type: parsedData.type === 'income' ? 'income' : 'expense',
+                category: safeType === 'investment' && (!parsedData.category || parsedData.category === 'Other') ? 'Investments' : (parsedData.category || 'Other'),
+                account: safeAccount,
+                paymentMethod: safeAccount === 'cash' ? 'Cash' : 'Card',
+                type: safeType,
                 merchant: (parsedData.merchant || '').trim()
             };
 

@@ -145,12 +145,17 @@ export const KoreAIContainer = ({ onClose }) => {
             const aiMsgId = Date.now() + 1;
 
             if (result.intent === 'add') {
+                const finalAmount = (result.type === 'expense' || result.type === 'investment')
+                    ? -Math.abs(result.amount)
+                    : Math.abs(result.amount);
+
                 const newTransaction = {
                     id: Math.floor(Math.random() * 100000000),
-                    type: result.type,
-                    amount: result.type === 'expense' ? -Math.abs(result.amount) : Math.abs(result.amount),
-                    category: result.category,
-                    date: result.date,
+                    type: result.type || 'expense',
+                    account: result.account || 'bank',
+                    amount: finalAmount,
+                    category: result.category || (result.type === 'investment' ? 'Investments' : 'Other'),
+                    date: result.date || new Date().toISOString().split('T')[0],
                     note: result.note
                 };
 

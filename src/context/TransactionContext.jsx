@@ -17,12 +17,27 @@ import {
     addPaymentDetectedListener
 } from '../services/paymentTracker';
 
+// Helper to extract account from document or note tag
+export const extractAccount = (doc) => {
+    if (doc.account) return doc.account;
+    if (doc.type === 'investment') return 'investment';
+    const note = (doc.note || '').toLowerCase();
+    if (note.includes('[#cash]') || note.includes('(cash)')) return 'cash';
+    if (note.includes('[#investment]') || note.includes('(investment)')) return 'investment';
+    return 'bank';
+};
+
+export const cleanNoteText = (note) => {
+    return (note || '').replace(/\[#(cash|investment|bank)\]/gi, '').trim();
+};
+
 export const TransactionContext = createContext();
 
 export const TransactionProvider = ({ children }) => {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
+    const [selectedAccount, setSelectedAccount] = useState('all'); // 'all' | 'bank' | 'cash' | 'investment'
     const { user } = useAuth();
 
     const currentMonthKey = getCurrentMonthKey();
@@ -43,7 +58,8 @@ export const TransactionProvider = ({ children }) => {
                             const isIncome = item.type === 'income';
                             const signedAmount = isIncome ? Math.abs(item.amount) : -Math.abs(item.amount);
                             await addTransaction({
-                                type: isIncome ? 'income' : 'expense',
+                                type: isIncome ? 'income' : (item.type || 'expense'),
+                                account: item.account || 'bank',
                                 amount: signedAmount,
                                 category: item.category || (isIncome ? 'Salary' : 'Other'),
                                 date: item.date || new Date().toISOString(),
@@ -62,15 +78,17 @@ export const TransactionProvider = ({ children }) => {
                 if (newTx && newTx.amount) {
                     const isIncome = newTx.type === 'income';
                     const signedAmount = isIncome ? Math.abs(newTx.amount) : -Math.abs(newTx.amount);
+                    const txAccount = newTx.account || 'bank';
                     setTransactions((prev) => {
                         if (prev.some(t => t.id === newTx.id)) return prev;
                         return [{
                             id: newTx.id || String(Date.now()),
-                            type: isIncome ? 'income' : 'expense',
+                            type: isIncome ? 'income' : (newTx.type || 'expense'),
+                            account: txAccount,
                             amount: signedAmount,
                             category: newTx.category || (isIncome ? 'Salary' : 'Other'),
                             date: newTx.date || new Date().toISOString(),
-                            note: newTx.note || `Auto-tracked: ${newTx.merchant}`
+                            note: cleanNoteText(newTx.note) || `Auto-tracked: ${newTx.merchant}`
                         }, ...prev];
                     });
                 }
@@ -100,18 +118,22 @@ export const TransactionProvider = ({ children }) => {
                 ]
             );
 
-            // Transform Appwrite documents to our transaction format with normalized signed amounts
+            // Transform Appwrite documents to our transaction format with normalized signed amounts and account types
             const transformedTransactions = response.documents.map(doc => {
                 const amt = parseFloat(doc.amount) || 0;
                 const isIncome = doc.type ? doc.type === 'income' : amt > 0;
-                const signedAmount = isIncome ? Math.abs(amt) : -Math.abs(amt);
+                const isInvest = doc.type === 'investment';
+                const signedAmount = isIncome || isInvest ? Math.abs(amt) : -Math.abs(amt);
+                const account = extractAccount(doc);
+
                 return {
                     id: doc.$id,
-                    type: isIncome ? 'income' : 'expense',
+                    type: doc.type || (isIncome ? 'income' : 'expense'),
+                    account,
                     amount: signedAmount,
                     category: doc.category,
                     date: doc.date,
-                    note: doc.note || ''
+                    note: cleanNoteText(doc.note)
                 };
             });
 
@@ -126,33 +148,60 @@ export const TransactionProvider = ({ children }) => {
 
     const addTransaction = async (transaction) => {
         try {
-            const docData = {
+            const account = transaction.account || (transaction.type === 'investment' ? 'investment' : 'bank');
+            const cleanNote = cleanNoteText(transaction.note);
+
+            let docData = {
                 userId: user.$id,
                 type: transaction.type,
                 amount: transaction.amount,
                 category: transaction.category,
                 date: transaction.date,
-                note: transaction.note || ''
+                note: cleanNote
             };
 
-            const response = await databases.createDocument(
-                DATABASE_ID,
-                COLLECTION_ID,
-                ID.unique(),
-                docData
-            );
+            // Attempt native account attribute if not bank
+            if (account !== 'bank') {
+                docData.account = account;
+            }
+
+            let response;
+            try {
+                response = await databases.createDocument(
+                    DATABASE_ID,
+                    COLLECTION_ID,
+                    ID.unique(),
+                    docData
+                );
+            } catch (err) {
+                // If Appwrite throws attribute not found for 'account', fallback to embedding tag in note
+                if (docData.account && (err?.message?.includes('account') || err?.code === 400)) {
+                    delete docData.account;
+                    docData.note = `${cleanNote} [#${account}]`.trim();
+                    response = await databases.createDocument(
+                        DATABASE_ID,
+                        COLLECTION_ID,
+                        ID.unique(),
+                        docData
+                    );
+                } else {
+                    throw err;
+                }
+            }
 
             // Add to local state
             const newTransaction = {
                 id: response.$id,
                 type: response.type,
+                account,
                 amount: response.amount,
                 category: response.category,
                 date: response.date,
-                note: response.note || ''
+                note: cleanNote
             };
 
             setTransactions(prev => [newTransaction, ...prev]);
+            return newTransaction;
         } catch (error) {
             console.error('Error adding transaction:', error);
             throw error;
@@ -177,24 +226,47 @@ export const TransactionProvider = ({ children }) => {
 
     const updateTransaction = async (id, updatedData) => {
         try {
-            const docData = {
+            const account = updatedData.account || (updatedData.type === 'investment' ? 'investment' : 'bank');
+            const cleanNote = cleanNoteText(updatedData.note);
+
+            let docData = {
                 type: updatedData.type,
                 amount: updatedData.amount,
                 category: updatedData.category,
                 date: updatedData.date,
-                note: updatedData.note || ''
+                note: cleanNote
             };
 
-            const response = await databases.updateDocument(
-                DATABASE_ID,
-                COLLECTION_ID,
-                id,
-                docData
-            );
+            if (account !== 'bank') {
+                docData.account = account;
+            }
+
+            let response;
+            try {
+                response = await databases.updateDocument(
+                    DATABASE_ID,
+                    COLLECTION_ID,
+                    id,
+                    docData
+                );
+            } catch (err) {
+                if (docData.account && (err?.message?.includes('account') || err?.code === 400)) {
+                    delete docData.account;
+                    docData.note = `${cleanNote} [#${account}]`.trim();
+                    response = await databases.updateDocument(
+                        DATABASE_ID,
+                        COLLECTION_ID,
+                        id,
+                        docData
+                    );
+                } else {
+                    throw err;
+                }
+            }
 
             // Update local state
             setTransactions(prev => prev.map(t =>
-                t.id === id ? { ...t, ...docData } : t
+                t.id === id ? { ...t, ...docData, account, note: cleanNote } : t
             ));
         } catch (error) {
             console.error('Error updating transaction:', error);
@@ -242,7 +314,7 @@ export const TransactionProvider = ({ children }) => {
             const isInc = t.type ? t.type === 'income' : amt > 0;
             if (isInc) {
                 monthData.income += Math.abs(amt);
-            } else {
+            } else if (t.type !== 'investment') {
                 monthData.expense += Math.abs(amt);
             }
             monthData.net = monthData.income - monthData.expense;
@@ -252,69 +324,128 @@ export const TransactionProvider = ({ children }) => {
         return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
     }, [transactions, currentMonthKey]);
 
-    // Transactions filtered by the selected period
+    // Transactions filtered by the selected period and optional account
     const monthlyTransactions = useMemo(() => {
-        if (!selectedMonth || selectedMonth === 'all') {
-            return transactions;
-        }
-        return transactions.filter(t => getTransactionMonthKey(t.date) === selectedMonth);
-    }, [transactions, selectedMonth]);
+        let list = (!selectedMonth || selectedMonth === 'all')
+            ? transactions
+            : transactions.filter(t => getTransactionMonthKey(t.date) === selectedMonth);
 
-    // Calculate metrics for selected period & all-time
+        if (selectedAccount && selectedAccount !== 'all') {
+            if (selectedAccount === 'investment') {
+                list = list.filter(t => t.type === 'investment' || t.account === 'investment');
+            } else {
+                list = list.filter(t => (t.account || 'bank') === selectedAccount);
+            }
+        }
+        return list;
+    }, [transactions, selectedMonth, selectedAccount]);
+
+    // Calculate metrics for selected period, all-time, and asset allocations
     const monthlyStats = useMemo(() => {
         // Selected period totals
-        const mAmounts = monthlyTransactions.map(t => {
-            const amt = parseFloat(t.amount) || 0;
-            const isInc = t.type ? t.type === 'income' : amt > 0;
-            return isInc ? Math.abs(amt) : -Math.abs(amt);
+        let monthlyIncome = 0;
+        let monthlyExpense = 0;
+        let monthlyInvested = 0;
+
+        const periodTxs = (!selectedMonth || selectedMonth === 'all')
+            ? transactions
+            : transactions.filter(t => getTransactionMonthKey(t.date) === selectedMonth);
+
+        periodTxs.forEach(t => {
+            const amt = Math.abs(parseFloat(t.amount) || 0);
+            if (t.type === 'income') {
+                monthlyIncome += amt;
+            } else if (t.type === 'investment') {
+                monthlyInvested += amt;
+            } else {
+                // 'expense' or fallback
+                monthlyExpense += amt;
+            }
         });
 
-        const monthlyIncome = mAmounts
-            .filter(a => a > 0)
-            .reduce((acc, a) => acc + a, 0);
-
-        const monthlyExpense = mAmounts
-            .filter(a => a < 0)
-            .reduce((acc, a) => acc + Math.abs(a), 0);
-
         const monthlyNet = monthlyIncome - monthlyExpense;
-
         const daysElapsed = getDaysElapsedInMonth(selectedMonth);
         const dailyAverage = monthlyExpense / Math.max(daysElapsed, 1);
 
         const savingsRate = monthlyIncome > 0
-            ? Math.max(0, Math.round(((monthlyIncome - monthlyExpense) / monthlyIncome) * 100))
+            ? Math.min(100, Math.max(0, Math.round(((monthlyIncome - monthlyExpense) / monthlyIncome) * 100)))
             : 0;
 
-        // All-time totals
-        const allAmounts = transactions.map(t => {
-            const amt = parseFloat(t.amount) || 0;
-            const isInc = t.type ? t.type === 'income' : amt > 0;
-            return isInc ? Math.abs(amt) : -Math.abs(amt);
+        // All-time asset balances across ALL transactions
+        let bankBalance = 0;
+        let cashBalance = 0;
+        let investedTotal = 0;
+        let allTimeIncome = 0;
+        let allTimeExpense = 0;
+
+        transactions.forEach(t => {
+            const amt = Math.abs(parseFloat(t.amount) || 0);
+            const account = t.account || 'bank';
+            const isInc = t.type ? t.type === 'income' : (parseFloat(t.amount) || 0) > 0;
+
+            if (t.type === 'investment') {
+                investedTotal += amt;
+                if (account === 'cash') {
+                    cashBalance -= amt;
+                } else {
+                    bankBalance -= amt;
+                }
+            } else if (t.type === 'transfer') {
+                if (account === 'cash') {
+                    cashBalance -= amt;
+                    bankBalance += amt;
+                } else {
+                    bankBalance -= amt;
+                    cashBalance += amt;
+                }
+            } else if (isInc) {
+                allTimeIncome += amt;
+                if (account === 'cash') {
+                    cashBalance += amt;
+                } else {
+                    bankBalance += amt;
+                }
+            } else {
+                // Regular expense
+                allTimeExpense += amt;
+                if (account === 'cash') {
+                    cashBalance -= amt;
+                } else {
+                    bankBalance -= amt;
+                }
+            }
         });
 
-        const allTimeIncome = allAmounts
-            .filter(a => a > 0)
-            .reduce((acc, a) => acc + a, 0);
+        const liquidBalance = bankBalance + cashBalance;
+        const totalNetWorth = liquidBalance + investedTotal;
 
-        const allTimeExpense = allAmounts
-            .filter(a => a < 0)
-            .reduce((acc, a) => acc + Math.abs(a), 0);
-
-        const allTimeBalance = allTimeIncome - allTimeExpense;
+        // Asset allocation percentages
+        const positiveWealth = Math.max(totalNetWorth, 1);
+        const bankPercent = totalNetWorth > 0 ? Math.round((Math.max(0, bankBalance) / positiveWealth) * 100) : 0;
+        const cashPercent = totalNetWorth > 0 ? Math.round((Math.max(0, cashBalance) / positiveWealth) * 100) : 0;
+        const investedPercent = totalNetWorth > 0 ? Math.round((Math.max(0, investedTotal) / positiveWealth) * 100) : 0;
 
         return {
             monthlyIncome,
             monthlyExpense,
+            monthlyInvested,
             monthlyNet,
             dailyAverage,
             savingsRate,
-            allTimeBalance,
+            allTimeBalance: liquidBalance,
             allTimeIncome,
             allTimeExpense,
+            bankBalance,
+            cashBalance,
+            investedTotal,
+            liquidBalance,
+            totalNetWorth,
+            bankPercent,
+            cashPercent,
+            investedPercent,
             daysElapsed
         };
-    }, [monthlyTransactions, transactions, selectedMonth]);
+    }, [transactions, selectedMonth]);
 
     // Period Navigation Helpers
     const goToPreviousMonth = () => {
@@ -345,6 +476,8 @@ export const TransactionProvider = ({ children }) => {
                 monthlyTransactions,
                 selectedMonth,
                 setSelectedMonth,
+                selectedAccount,
+                setSelectedAccount,
                 currentMonthKey,
                 isCurrentMonth,
                 availableMonths,

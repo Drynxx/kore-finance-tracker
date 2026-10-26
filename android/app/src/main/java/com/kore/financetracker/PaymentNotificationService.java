@@ -340,40 +340,49 @@ public class PaymentNotificationService extends NotificationListenerService {
 
         if (amount <= 0) return null;
 
-        // Determine transaction type (expense vs income)
-        String type = detectTransactionType(fullContent);
+        // Determine transaction type (expense vs income vs transfer)
+        boolean isAtm = Pattern.compile("\\b(?:retragere(?:\\s+de)?\\s+numerar|bancomat|atm\\s+withdrawal|cash\\s+withdrawal)\\b", Pattern.CASE_INSENSITIVE).matcher(fullContent).find();
 
-        // Extract Merchant / Sender
-        String merchant = "income".equals(type) ? "Income" : "Payment";
+        String type;
+        String merchant;
+        String category;
 
-        if ("income".equals(type)) {
-            Pattern senderPattern = Pattern.compile("(?:de\\s+la|from|expeditor|primit\\s+de\\s+la)\\s+([A-Za-z0-9&'’\\- ]+?)(?:\\s+pe|\\s+in|\\s+cu|\\.|,|$)", Pattern.CASE_INSENSITIVE);
-            Matcher senderMatcher = senderPattern.matcher(fullContent);
-            if (senderMatcher.find()) {
-                String found = senderMatcher.group(1).trim();
-                if (found.length() > 1 && found.length() < 35 && !found.equalsIgnoreCase("your card") && !found.equalsIgnoreCase("contul tau")) {
-                    merchant = found;
-                }
-            } else if (!title.equalsIgnoreCase("Google Pay") && !title.equalsIgnoreCase("Google Wallet") && !title.equalsIgnoreCase("Revolut") && title.length() > 2) {
-                merchant = title.trim();
-            }
+        if (isAtm) {
+            type = "transfer";
+            merchant = "ATM";
+            category = "Other";
         } else {
-            Pattern merchantPattern = Pattern.compile("(?:to|at|la|către|la\\s+comerciantul)\\s+([A-Za-z0-9&'’\\- ]+?)(?:\\s+on|\\s+using|\\s+with|\\s+cu|\\.|,|$)", Pattern.CASE_INSENSITIVE);
-            Matcher merchantMatcher = merchantPattern.matcher(fullContent);
-            if (merchantMatcher.find()) {
-                String found = merchantMatcher.group(1).trim();
-                if (found.length() > 1 && found.length() < 35 && !found.equalsIgnoreCase("your card") && !found.equalsIgnoreCase("cardul tau")) {
-                    merchant = found;
-                }
-            } else if (!title.equalsIgnoreCase("Google Pay") && !title.equalsIgnoreCase("Google Wallet") && !title.equalsIgnoreCase("Wallet") && title.length() > 2) {
-                merchant = title.trim();
-            }
-        }
+            type = detectTransactionType(fullContent);
+            merchant = "income".equals(type) ? "Income" : "Payment";
 
-        // Categorize based on type and merchant/content
-        String category = "income".equals(type) 
-            ? categorizeIncome(merchant + " " + fullContent)
-            : categorizeExpense(merchant + " " + fullContent);
+            if ("income".equals(type)) {
+                Pattern senderPattern = Pattern.compile("(?:de\\s+la|from|expeditor|primit\\s+de\\s+la)\\s+([A-Za-z0-9&'’\\- ]+?)(?:\\s+pe|\\s+in|\\s+cu|\\.|,|$)", Pattern.CASE_INSENSITIVE);
+                Matcher senderMatcher = senderPattern.matcher(fullContent);
+                if (senderMatcher.find()) {
+                    String found = senderMatcher.group(1).trim();
+                    if (found.length() > 1 && found.length() < 35 && !found.equalsIgnoreCase("your card") && !found.equalsIgnoreCase("contul tau")) {
+                        merchant = found;
+                    }
+                } else if (!title.equalsIgnoreCase("Google Pay") && !title.equalsIgnoreCase("Google Wallet") && !title.equalsIgnoreCase("Revolut") && title.length() > 2) {
+                    merchant = title.trim();
+                }
+            } else {
+                Pattern merchantPattern = Pattern.compile("(?:to|at|la|către|la\\s+comerciantul)\\s+([A-Za-z0-9&'’\\- ]+?)(?:\\s+on|\\s+using|\\s+with|\\s+cu|\\.|,|$)", Pattern.CASE_INSENSITIVE);
+                Matcher merchantMatcher = merchantPattern.matcher(fullContent);
+                if (merchantMatcher.find()) {
+                    String found = merchantMatcher.group(1).trim();
+                    if (found.length() > 1 && found.length() < 35 && !found.equalsIgnoreCase("your card") && !found.equalsIgnoreCase("cardul tau")) {
+                        merchant = found;
+                    }
+                } else if (!title.equalsIgnoreCase("Google Pay") && !title.equalsIgnoreCase("Google Wallet") && !title.equalsIgnoreCase("Wallet") && title.length() > 2) {
+                    merchant = title.trim();
+                }
+            }
+
+            category = "income".equals(type) 
+                ? categorizeIncome(merchant + " " + fullContent)
+                : categorizeExpense(merchant + " " + fullContent);
+        }
 
         ParsedTransaction tx = new ParsedTransaction();
         tx.id = UUID.randomUUID().toString();
@@ -384,9 +393,13 @@ public class PaymentNotificationService extends NotificationListenerService {
         tx.category = category;
         
         String source = title.isEmpty() ? "Bank Notification" : title;
-        tx.note = "income".equals(type)
-            ? "Auto-tracked income from: " + merchant
-            : "Auto-tracked via " + source + ": " + merchant;
+        if ("transfer".equals(type)) {
+            tx.note = "ATM Withdrawal -> Pocket Cash";
+        } else if ("income".equals(type)) {
+            tx.note = "Auto-tracked income from: " + merchant;
+        } else {
+            tx.note = "Auto-tracked via " + source + ": " + merchant;
+        }
         
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));

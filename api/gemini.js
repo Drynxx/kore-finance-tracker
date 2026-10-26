@@ -58,22 +58,37 @@ const fallbackParseTransaction = (text = '', history = []) => {
     else if (/(haine|shoes|adidasi|mall|zara|hm|shopping|cumparaturi|emag|altex|flanco|fashion|tricou|pantaloni)/i.test(clean)) category = 'Shopping';
     else if (/(cinema|film|netflix|spotify|party|bere|club|joc|game|distractie|biliard|bowling|iesire)/i.test(clean)) category = 'Entertainment';
     else if (/(salariu|salary|venit|avans|bonus|incasat|primit bani|transfer primit|diurna)/i.test(clean)) category = 'Salary';
+    else if (/(investit|investitii|investitie|actiuni|stocks|etf|tradeville|crypto|bitcoin|btc|eth|fonduri|titluri de stat|bursa|fidelis|tezaur)/i.test(clean)) category = 'Investments';
 
+    const isInvestment = category === 'Investments' || /(investit|investitii|actiuni|stocks|etf|tradeville|crypto|bitcoin|btc|eth|fonduri)/i.test(clean);
     const isIncome = /(salariu|salary|venit|avans|bonus|incasat|primit bani|transfer primit|diurna|income)/i.test(clean);
-    const type = isIncome ? 'income' : 'expense';
-    const paymentMethod = /(card|pos|apple pay|google pay|online|revolut)/i.test(clean) ? 'Card' : 'Cash';
+    
+    let type = 'expense';
+    if (isInvestment) {
+        type = 'investment';
+    } else if (isIncome) {
+        type = 'income';
+    }
+
+    const isCashExplicit = /(cash|numerar|in mana|din buzunar|bacsis|bani gheata)/i.test(clean);
+    const account = isCashExplicit ? 'cash' : 'bank';
+    const paymentMethod = account === 'cash' ? 'Cash' : (/(card|pos|apple pay|google pay|online|revolut)/i.test(clean) ? 'Card' : 'Bank');
 
     // Note extraction
     let merchant = text
         .replace(/(\d+(?:[.,]\d{1,2})?)/g, '')
-        .replace(/\b(lei|ron|eur|euro|usd|am|dat|cheltuit|pe|la|pentru|in|spent|for|on|bought|paid|o|un|de|cu|din)\b/gi, '')
+        .replace(/\b(lei|ron|eur|euro|usd|am|dat|cheltuit|pe|la|pentru|in|spent|for|on|bought|paid|o|un|de|cu|din|investit|investitii|cash|numerar)\b/gi, '')
         .replace(/[^\w\s\u00C0-\u024F]/gi, '')
         .trim();
 
     if (!merchant) merchant = category;
 
     // Conversational query answers when no amount was given
-    let conversational_response = `Am înregistrat ${amount} ${currency} pentru ${category} (${merchant}).`;
+    let conversational_response = type === 'investment'
+        ? `Am înregistrat o investiție de ${amount} ${currency} (${merchant}).`
+        : account === 'cash'
+            ? `Am înregistrat ${amount} ${currency} în numerar (cash) pentru ${category} (${merchant}).`
+            : `Am înregistrat ${amount} ${currency} pentru ${category} (${merchant}).`;
 
     if (amount === 0) {
         if (/(salut|buna|hello|hi|hei)/i.test(clean)) {
@@ -95,6 +110,7 @@ const fallbackParseTransaction = (text = '', history = []) => {
         amount,
         currency,
         category,
+        account,
         paymentMethod,
         type,
         merchant,
@@ -360,20 +376,22 @@ Schema:
 {
   "amount": number,
   "currency": string,
-  "category": "Food" | "Rent" | "Salary" | "Freelance" | "Transport" | "Entertainment" | "Shopping" | "Utilities" | "Other",
+  "category": "Food" | "Rent" | "Salary" | "Freelance" | "Transport" | "Entertainment" | "Shopping" | "Utilities" | "Investments" | "Other",
+  "account": "bank" | "cash",
   "paymentMethod": "Cash" | "Card",
-  "type": "expense" | "income",
+  "type": "expense" | "income" | "investment" | "transfer",
   "merchant": string
 }
 
 Rules:
 1. amount: strictly positive number (e.g. 15 or 45.5).
 2. currency: "RON" (default), "EUR", "USD", "GBP". Map "lei"/"leu" -> "RON".
-3. category: select best fit from schema.
-4. paymentMethod: "Card" if digital/taxi/delivery/card mentioned; default "Cash".
-5. type: "income" for salary/received money; default "expense".
-6. merchant: clean store/vendor name or "".
-7. Output pure raw JSON only.`;
+3. category: select best fit from schema. Map stocks/crypto/ETFs/investments to "Investments".
+4. account: "cash" if cash/numerar/pocket/din buzunar/in mana mentioned; default "bank".
+5. paymentMethod: "Cash" if account is "cash"; default "Card".
+6. type: "investment" for stocks/crypto/ETFs/investing; "income" for salary/received money/tips; default "expense".
+7. merchant: clean store/vendor/asset name or "".
+8. Output pure raw JSON only.`;
 
         // Priority 1: Gemini (maxOutputTokens: 128)
         if (geminiApiKey) {
@@ -427,16 +445,17 @@ If input is in English, "conversational_response" MUST be in English.
 
 ---
 INTENT 1: ADD_TRANSACTION
-Trigger: User logs expense/income (e.g. "Spent 50 on pizza", "Am cheltuit 50 lei pe pizza", "Cafea 15 lei").
+Trigger: User logs expense/income/investment (e.g. "Spent 50 on pizza", "Am cheltuit 50 lei pe pizza", "Am dat 20 lei cash", "Am investit 500 lei in crypto/actiuni").
 Output JSON:
 {
     "intent": "add",
-    "type": "expense" | "income",
+    "type": "expense" | "income" | "investment" | "transfer",
+    "account": "bank" | "cash",
     "amount": number,
-    "category": "Food" | "Rent" | "Salary" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Other",
+    "category": "Food" | "Rent" | "Salary" | "Freelance" | "Transport" | "Shopping" | "Utilities" | "Entertainment" | "Investments" | "Other",
     "note": "short description",
     "date": "YYYY-MM-DD",
-    "conversational_response": "Am adăugat 50 lei pentru pizza."
+    "conversational_response": "Am înregistrat 50 lei pentru pizza."
 }
 
 ---

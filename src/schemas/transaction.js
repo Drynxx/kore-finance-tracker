@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
 export const transactionSchema = z.object({
-    type: z.enum(['income', 'expense'], {
+    type: z.enum(['income', 'expense', 'investment', 'transfer'], {
         required_error: "Transaction type is required",
     }),
+    account: z.enum(['bank', 'cash', 'investment']).optional().default('bank'),
     amount: z.number({
         required_error: "Amount is required",
         invalid_type_error: "Amount must be a number",

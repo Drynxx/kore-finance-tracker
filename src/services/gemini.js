@@ -47,6 +47,11 @@ const CATEGORY_DICTIONARY = {
     ],
     Freelance: [
         'freelance', 'client', 'proiect', 'factura incasata', 'upwork', 'fiverr', 'consultanta', 'onorariu'
+    ],
+    Investments: [
+        'investit', 'investitii', 'investitie', 'actiuni', 'stocks', 'etf', 'tradeville',
+        'revolut stocks', 'crypto', 'bitcoin', 'btc', 'eth', 'fonduri mutuale', 'bursa',
+        'titluri de stat', 'fidelis', 'tezaur', 'aur', 'gold', 'investitii bursa'
     ]
 };
 
@@ -305,19 +310,39 @@ export const parseLocalVoiceShortcut = (text = '', history = []) => {
     // Check dictionary & adaptive memory first
     let category = matchLocalCategory(clean) || 'Other';
 
+    const isInvestment = /(investit|investitii|investitie|actiuni|stocks|etf|tradeville|crypto|bitcoin|btc|eth|fonduri|titluri de stat|fidelis|tezaur)/i.test(clean);
     const isIncome = /(salariu|salary|venit|avans|bonus|incasat|primit bani|transfer primit|diurna|income)/i.test(clean);
-    const type = isIncome ? 'income' : 'expense';
-    const paymentMethod = /(card|pos|apple pay|google pay|online|revolut)/i.test(clean) ? 'Card' : 'Cash';
+
+    let type = 'expense';
+    if (isInvestment) {
+        type = 'investment';
+        if (category === 'Other') category = 'Investments';
+    } else if (isIncome) {
+        type = 'income';
+    }
+
+    // Account detection (Bank vs Pocket Cash)
+    let account = 'bank';
+    const isCashExplicit = /(cash|numerar|in mana|din buzunar|bacsis|bani gheata|cash in pocket)/i.test(clean);
+    if (isCashExplicit) {
+        account = 'cash';
+    }
+
+    const paymentMethod = account === 'cash' ? 'Cash' : (/(card|pos|apple pay|google pay|online|revolut)/i.test(clean) ? 'Card' : 'Bank');
 
     let merchant = text
         .replace(/(\d+(?:[.,]\d{1,2})?)/g, '')
-        .replace(/\b(lei|ron|eur|euro|usd|am|dat|cheltuit|pe|la|pentru|in|spent|for|on|bought|paid|o|un|de|cu|din)\b/gi, '')
+        .replace(/\b(lei|ron|eur|euro|usd|am|dat|cheltuit|pe|la|pentru|in|spent|for|on|bought|paid|o|un|de|cu|din|investit|investitii|cash|numerar)\b/gi, '')
         .replace(/[^\w\s\u00C0-\u024F]/gi, '')
         .trim();
 
     if (!merchant) merchant = category;
 
-    let conversational_response = `Am înregistrat ${amount} ${currency} pentru ${category} (${merchant}).`;
+    let conversational_response = type === 'investment'
+        ? `Am înregistrat o investiție de ${amount} ${currency} (${merchant}).`
+        : account === 'cash'
+            ? `Am înregistrat ${amount} ${currency} în numerar (cash) pentru ${category} (${merchant}).`
+            : `Am înregistrat ${amount} ${currency} pentru ${category} (${merchant}).`;
 
     if (amount === 0) {
         if (/(salut|buna|hello|hi|hei)/i.test(clean)) {
@@ -339,6 +364,7 @@ export const parseLocalVoiceShortcut = (text = '', history = []) => {
         amount,
         currency,
         category,
+        account,
         paymentMethod,
         type,
         merchant,
@@ -429,6 +455,7 @@ export const parseTransactionWithGemini = async (text, history = [], currentBala
         return {
             intent: "add",
             type: local.type,
+            account: local.account || 'bank',
             amount: local.amount,
             category: local.category,
             note: local.merchant || text,
@@ -446,6 +473,8 @@ export const parseTransactionWithGemini = async (text, history = [], currentBala
             history: history.slice(0, 10)
         });
         if (res && res.intent) {
+            if (!res.account) res.account = local.account || 'bank';
+            if (!res.type) res.type = local.type || 'expense';
             return res;
         }
     } catch {
@@ -455,6 +484,7 @@ export const parseTransactionWithGemini = async (text, history = [], currentBala
     return {
         intent: local.amount > 0 ? "add" : "query",
         type: local.type,
+        account: local.account || 'bank',
         amount: local.amount,
         category: local.category,
         note: local.merchant || text,
@@ -473,6 +503,8 @@ export const parseVoiceShortcut = async (text) => {
     try {
         const res = await callAiProxy('parseVoiceShortcut', { text });
         if (res && typeof res.amount === 'number' && res.amount > 0) {
+            if (!res.account) res.account = local.account || 'bank';
+            if (!res.type) res.type = local.type || 'expense';
             // Save vendor-to-category learning
             if (res.merchant && res.category) {
                 recordVendorCategory(res.merchant, res.category);

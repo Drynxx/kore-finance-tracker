@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
     Coffee, Home, Briefcase, Car, Smartphone, ShoppingCart, Utensils,
     Zap, Film, MoreHorizontal, Filter, Trash2, Pencil, RotateCcw,
-    Calendar, ArrowDownRight, ArrowUpRight, Wallet
+    Calendar, ArrowDownRight, ArrowUpRight, Wallet, TrendingUp
 } from 'lucide-react';
 
 const CATEGORY_ICONS = {
@@ -20,6 +20,7 @@ const CATEGORY_ICONS = {
     Entertainment: Film,
     Shopping: ShoppingCart,
     Utilities: Smartphone,
+    Investments: TrendingUp,
     Other: MoreHorizontal
 };
 
@@ -29,6 +30,8 @@ const TransactionList = () => {
         monthlyTransactions,
         selectedMonth,
         setSelectedMonth,
+        selectedAccount,
+        setSelectedAccount,
         currentMonthKey,
         isCurrentMonth,
         goToCurrentMonth,
@@ -40,7 +43,7 @@ const TransactionList = () => {
     const [editingTransaction, setEditingTransaction] = useState(null);
 
     const isAllTime = selectedMonth === 'all';
-    const displayedTransactions = isAllTime ? transactions : monthlyTransactions;
+    const displayedTransactions = monthlyTransactions;
 
     const groupedTransactions = displayedTransactions.reduce((groups, transaction) => {
         const date = transaction.date ? transaction.date.split('T')[0] : 'Unknown';
@@ -100,8 +103,55 @@ const TransactionList = () => {
                     </div>
                 </div>
 
-                {/* Period Summary Quick Stats Strip */}
-
+                {/* Account Filter Pills Strip */}
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-3 border-t border-white/5">
+                    <button
+                        onClick={() => setSelectedAccount('all')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                            !selectedAccount || selectedAccount === 'all'
+                                ? 'bg-white/20 text-white shadow-md border border-white/20'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                        }`}
+                    >
+                        All Accounts
+                    </button>
+                    <button
+                        onClick={() => setSelectedAccount('bank')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
+                            selectedAccount === 'bank'
+                                ? 'bg-blue-500/30 text-blue-200 border border-blue-400/30 shadow-md shadow-blue-500/10'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                        }`}
+                    >
+                        <span>💳</span>
+                        <span>Bank</span>
+                        <span className="text-[11px] opacity-75">({formatAmount(monthlyStats.bankBalance)})</span>
+                    </button>
+                    <button
+                        onClick={() => setSelectedAccount('cash')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
+                            selectedAccount === 'cash'
+                                ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/30 shadow-md shadow-emerald-500/10'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                        }`}
+                    >
+                        <span>💵</span>
+                        <span>Pocket Cash</span>
+                        <span className="text-[11px] opacity-75">({formatAmount(monthlyStats.cashBalance)})</span>
+                    </button>
+                    <button
+                        onClick={() => setSelectedAccount('investment')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
+                            selectedAccount === 'investment'
+                                ? 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 shadow-md shadow-indigo-500/10'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                        }`}
+                    >
+                        <span>📈</span>
+                        <span>Investments</span>
+                        <span className="text-[11px] opacity-75">({formatAmount(monthlyStats.investedTotal)})</span>
+                    </button>
+                </div>
             </div>
 
 
@@ -142,12 +192,39 @@ const TransactionList = () => {
                                                     {/* Category & Note */}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center justify-between md:justify-start gap-2">
-                                                            <p className="font-bold text-white text-base md:text-lg tracking-wide truncate drop-shadow-md">
-                                                                {transaction.category}
-                                                            </p>
+                                                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                                                <p className="font-bold text-white text-base md:text-lg tracking-wide truncate drop-shadow-md">
+                                                                    {transaction.category}
+                                                                </p>
+                                                                {/* Account & Type Badges */}
+                                                                {transaction.account === 'cash' && (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 flex-shrink-0">
+                                                                        <span>💵</span> Pocket Cash
+                                                                    </span>
+                                                                )}
+                                                                {transaction.type === 'investment' && (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 flex-shrink-0">
+                                                                        <span>📈</span> Investment
+                                                                    </span>
+                                                                )}
+                                                                {transaction.type === 'transfer' && (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 flex-shrink-0">
+                                                                        <span>🔄</span> Transfer
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
                                                             {/* Mobile Amount */}
-                                                            <p className={`md:hidden font-medium tracking-tight text-base drop-shadow-md ${isExpense ? 'bg-gradient-to-b from-white to-slate-300 bg-clip-text text-transparent' : 'bg-gradient-to-b from-emerald-300 to-emerald-500 bg-clip-text text-transparent'}`}>
-                                                                {isExpense ? '-' : '+'}{formatAmount(Math.abs(transaction.amount))}
+                                                            <p className={`md:hidden font-medium tracking-tight text-base drop-shadow-md ${
+                                                                transaction.type === 'investment'
+                                                                    ? 'text-indigo-300'
+                                                                    : transaction.type === 'transfer'
+                                                                        ? 'text-amber-300'
+                                                                        : isExpense
+                                                                            ? 'bg-gradient-to-b from-white to-slate-300 bg-clip-text text-transparent'
+                                                                            : 'bg-gradient-to-b from-emerald-300 to-emerald-500 bg-clip-text text-transparent'
+                                                            }`}>
+                                                                {transaction.type === 'investment' ? '📈 ' : transaction.type === 'transfer' ? '🔄 ' : isExpense ? '-' : '+'}{formatAmount(Math.abs(transaction.amount))}
                                                             </p>
                                                         </div>
                                                         {transaction.note && (
@@ -159,8 +236,16 @@ const TransactionList = () => {
 
                                                     {/* Desktop Amount & Actions */}
                                                     <div className="hidden md:flex items-center gap-6">
-                                                        <p className={`font-medium tracking-tight text-lg drop-shadow-md ${isExpense ? 'bg-gradient-to-b from-white to-slate-300 bg-clip-text text-transparent' : 'bg-gradient-to-b from-emerald-300 to-emerald-500 bg-clip-text text-transparent'}`}>
-                                                            {isExpense ? '-' : '+'}{formatAmount(Math.abs(transaction.amount))}
+                                                        <p className={`font-medium tracking-tight text-lg drop-shadow-md ${
+                                                            transaction.type === 'investment'
+                                                                ? 'text-indigo-300'
+                                                                : transaction.type === 'transfer'
+                                                                    ? 'text-amber-300'
+                                                                    : isExpense
+                                                                        ? 'bg-gradient-to-b from-white to-slate-300 bg-clip-text text-transparent'
+                                                                        : 'bg-gradient-to-b from-emerald-300 to-emerald-500 bg-clip-text text-transparent'
+                                                        }`}>
+                                                            {transaction.type === 'investment' ? '📈 ' : transaction.type === 'transfer' ? '🔄 ' : isExpense ? '-' : '+'}{formatAmount(Math.abs(transaction.amount))}
                                                         </p>
 
 

@@ -7,12 +7,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { transactionSchema } from '../schemas/transaction';
 import { z } from 'zod';
 
-const CATEGORIES = ['Food', 'Rent', 'Salary', 'Freelance', 'Transport', 'Entertainment', 'Shopping', 'Utilities', 'Other'];
+const CATEGORIES = ['Food', 'Rent', 'Salary', 'Freelance', 'Transport', 'Entertainment', 'Shopping', 'Utilities', 'Investments', 'Other'];
 
 const AddTransactionModal = ({ onClose, transactionToEdit = null }) => {
     const { addTransaction, updateTransaction } = useContext(TransactionContext);
     const { currency } = useCurrency();
     const [type, setType] = useState('expense');
+    const [account, setAccount] = useState('bank'); // 'bank' | 'cash'
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState(''); // Empty initially to prompt search/select
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
@@ -26,7 +27,8 @@ const AddTransactionModal = ({ onClose, transactionToEdit = null }) => {
     // Load data if editing
     useEffect(() => {
         if (transactionToEdit) {
-            setType(transactionToEdit.type);
+            setType(transactionToEdit.type || 'expense');
+            setAccount(transactionToEdit.account || (transactionToEdit.type === 'investment' ? 'investment' : 'bank'));
             setAmount(Math.abs(transactionToEdit.amount).toString());
             setCategory(transactionToEdit.category);
             setDate(transactionToEdit.date.split('T')[0]);
@@ -57,10 +59,6 @@ const AddTransactionModal = ({ onClose, transactionToEdit = null }) => {
         return () => clearTimeout(timer);
     }, [note]);
 
-
-
-    // ... imports remain the same ...
-
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -71,10 +69,11 @@ const AddTransactionModal = ({ onClose, transactionToEdit = null }) => {
             // 1. Prepare data
             const rawData = {
                 type,
+                account,
                 amount: parseFloat(amount),
                 category,
                 date,
-                note: note.trim() || undefined // Zod optional expects undefined or missing, not empty string usually, but checking schema
+                note: note.trim() || undefined
             };
 
             // 2. Validate with Zod
@@ -87,6 +86,7 @@ const AddTransactionModal = ({ onClose, transactionToEdit = null }) => {
 
             const transactionPayload = {
                 type: validatedData.type,
+                account: validatedData.account || account,
                 amount: finalAmount,
                 category: validatedData.category,
                 date: validatedData.date,
@@ -178,21 +178,62 @@ const AddTransactionModal = ({ onClose, transactionToEdit = null }) => {
                 <div className="flex-1 overflow-y-auto p-6 space-y-8">
 
                     {/* Type Toggle - Subtle Segmented Control */}
-                    <div className="bg-white/5 p-1 rounded-xl flex">
+                    <div className="bg-white/5 p-1 rounded-xl flex gap-1">
                         <button
                             type="button"
-                            onClick={() => setType('expense')}
-                            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${type === 'expense' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            onClick={() => {
+                                setType('expense');
+                                if (category === 'Investments') setCategory('');
+                            }}
+                            className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${type === 'expense' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
                         >
                             Expense
                         </button>
                         <button
                             type="button"
-                            onClick={() => setType('income')}
-                            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${type === 'income' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            onClick={() => {
+                                setType('income');
+                                if (category === 'Investments') setCategory('');
+                            }}
+                            className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${type === 'income' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
                         >
                             Income
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setType('investment');
+                                setCategory('Investments');
+                            }}
+                            className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${type === 'investment' ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            📈 Investment
+                        </button>
+                    </div>
+
+                    {/* Account Selector */}
+                    <div className="flex items-center justify-between px-1">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            {type === 'investment' ? 'Funded From' : 'Account'}
+                        </span>
+                        <div className="flex gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
+                            <button
+                                type="button"
+                                onClick={() => setAccount('bank')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${account === 'bank' ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <span>💳</span>
+                                <span>Bank</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAccount('cash')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${account === 'cash' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <span>💵</span>
+                                <span>Pocket Cash</span>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Amount Input - Clean & Minimal */}

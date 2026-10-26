@@ -136,21 +136,44 @@ export const QuickLogHandler = () => {
                 ? -Math.abs(structuredData.amount)
                 : Math.abs(structuredData.amount);
 
+            const acc = structuredData.account || (structuredData.paymentMethod === 'Cash' ? 'cash' : 'bank');
+            let safeNote = `${structuredData.merchant ? structuredData.merchant + ' ' : ''}[${structuredData.paymentMethod}] ${textToProcess}`.trim();
+            if (acc !== 'bank' && !safeNote.includes(`[#${acc}]`)) {
+                safeNote = `${safeNote} [#${acc}]`.trim();
+            }
+
             const docData = {
                 userId: user.$id,
                 type: structuredData.type,
+                account: acc,
                 amount: finalAmount,
                 category: structuredData.category || 'Other',
                 date: new Date().toISOString(),
-                note: `${structuredData.merchant ? structuredData.merchant + ' ' : ''}[${structuredData.paymentMethod}] ${textToProcess}`.trim()
+                note: safeNote
             };
 
-            await databases.createDocument(
-                DATABASE_ID,
-                COLLECTION_ID,
-                ID.unique(),
-                docData
-            );
+            try {
+                await databases.createDocument(
+                    DATABASE_ID,
+                    COLLECTION_ID,
+                    ID.unique(),
+                    docData
+                );
+            } catch (err) {
+                // If Appwrite database doesn't have the 'account' attribute yet, retry without it (tag in note preserves it)
+                if (err.message && err.message.toLowerCase().includes('attribute') && docData.account) {
+                    const fallbackDoc = { ...docData };
+                    delete fallbackDoc.account;
+                    await databases.createDocument(
+                        DATABASE_ID,
+                        COLLECTION_ID,
+                        ID.unique(),
+                        fallbackDoc
+                    );
+                } else {
+                    throw err;
+                }
+            }
 
             // Step 3: Success state & Haptics
             setStatus('success');
