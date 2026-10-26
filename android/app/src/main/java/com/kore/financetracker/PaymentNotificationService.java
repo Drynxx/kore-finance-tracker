@@ -36,18 +36,41 @@ public class PaymentNotificationService extends NotificationListenerService {
     private static final String PREFS_NAME = "kore_payment_prefs";
     private static final String CHANNEL_ID = "kore_payment_alerts";
     
-    // Set of target package names for Google Pay, Google Wallet and popular financial apps
+    // Set of target package names for digital wallets & major banking apps
     private static final Set<String> TARGET_PACKAGES = new HashSet<>();
     static {
+        // Digital Wallets
         TARGET_PACKAGES.add("com.google.android.apps.walletnfcrel"); // Google Wallet / Google Pay
-        TARGET_PACKAGES.add("com.google.android.gms");               // Google Play Services Wallet prompts
+        TARGET_PACKAGES.add("com.paypal.android.p2pmobile");         // PayPal
+
+        // International Fintech
         TARGET_PACKAGES.add("com.revolut.revolut");                 // Revolut
         TARGET_PACKAGES.add("com.transferwise.android");            // Wise
         TARGET_PACKAGES.add("com.monzo.android");                   // Monzo
         TARGET_PACKAGES.add("com.chase.sig.android");               // Chase
+        TARGET_PACKAGES.add("com.n26.android");                     // N26
+
+        // Major Romanian Banking Apps
         TARGET_PACKAGES.add("ro.btrl.btpay");                       // BT Pay
-        TARGET_PACKAGES.add("com.ing.mobile");                      // ING Bank
+        TARGET_PACKAGES.add("ro.btrl.neobt");                       // NeoBT / BT24
+        TARGET_PACKAGES.add("com.ing.mobile");                      // ING Bank Romania / Home'Bank
+        TARGET_PACKAGES.add("ro.bcr.george");                       // George Romania (BCR)
+        TARGET_PACKAGES.add("ro.bcr.mobilebanking");                // BCR Mobile
+        TARGET_PACKAGES.add("ro.raiffeisen.smartmobile");           // Raiffeisen Smart Mobile
+        TARGET_PACKAGES.add("ro.cec.mobile");                       // CEC Bank Mobile
+        TARGET_PACKAGES.add("ro.brd.mobile");                       // BRD Mobile
+        TARGET_PACKAGES.add("com.experian.android.mybrdnet");       // MyBRD Mobile
+        TARGET_PACKAGES.add("eu.unicreditgroup.mca.ro");            // UniCredit Romania
+        TARGET_PACKAGES.add("ro.alphabank.alphasafe");              // Alpha Bank Romania
     }
+
+    // Amount & Currency Regex with strict word boundaries (\b) to prevent matching
+    // normal words like "sincronizare", "audio", "cadou", "ulei"
+    private static final Pattern AMOUNT_PATTERN = Pattern.compile(
+        "(?:^|\\s|[-+])([$€£¥₹]|\\b(?:RON|LEI|LEU|EUR|USD|GBP|CAD|AUD|CHF)\\b)\\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?|[0-9]+(?:[.,][0-9]{1,2})?)|" +
+        "(?:^|\\s|[-+])([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?|[0-9]+(?:[.,][0-9]{1,2})?)\\s*([$€£¥₹]|\\b(?:RON|LEI|LEU|EUR|USD|GBP|CAD|AUD|CHF)\\b)",
+        Pattern.CASE_INSENSITIVE
+    );
 
     // Cache of recent notification hashes to prevent duplicate logging within 60 seconds
     private static final Set<String> RECENT_HASHES = new HashSet<>();
@@ -88,18 +111,28 @@ public class PaymentNotificationService extends NotificationListenerService {
         String text = textCs != null ? textCs.toString() : "";
         String bigText = bigTextCs != null ? bigTextCs.toString() : "";
 
-        String combinedText = (title + " " + text + " " + bigText).trim();
+        String combinedText = (title + " " + text + " " + bigText).replaceAll("\\s+", " ").trim();
         if (combinedText.isEmpty()) return;
 
-        // Check if package is a target payment package OR matches strong payment keywords
-        boolean isTargetPackage = TARGET_PACKAGES.contains(packageName);
-        boolean hasPaymentKeywords = containsPaymentKeywords(combinedText);
-
-        if (!isTargetPackage && !hasPaymentKeywords) {
+        // 1. Immediately drop common non-payment noise (OTPs, declined transactions, balance alerts, bill reminders)
+        if (isNoiseOrExcludedNotification(combinedText)) {
+            Log.d(TAG, "Notification excluded as noise/non-payment: " + combinedText);
             return;
         }
 
-        // Deduplicate: avoid re-processing identical notification text within 60s
+        // 2. Package filtering:
+        // - Known banking/wallet apps: accepted if not excluded above
+        // - Google Play Services (com.google.android.gms): accepted ONLY if explicitly a Google Wallet / Google Pay prompt
+        // - Other apps (e.g. SMS/carrier): accepted ONLY if they contain explicit completed financial transaction verbs
+        boolean isTargetPackage = TARGET_PACKAGES.contains(packageName);
+        boolean isGmsWallet = isGooglePlayWalletPrompt(packageName, title, combinedText, sbn);
+        boolean hasExplicitPaymentVerbs = containsExplicitTransactionVerbs(combinedText);
+
+        if (!isTargetPackage && !isGmsWallet && !hasExplicitPaymentVerbs) {
+            return;
+        }
+
+        // 3. Deduplicate: avoid re-processing identical notification text within 60s
         long now = System.currentTimeMillis();
         if (now - LAST_CACHE_CLEAR > 60000) {
             RECENT_HASHES.clear();
@@ -114,38 +147,145 @@ public class PaymentNotificationService extends NotificationListenerService {
 
         Log.i(TAG, "Potential payment notification intercepted from [" + packageName + "]: " + combinedText);
 
-        // Parse payment details
+        // 4. Parse payment details (amount, currency, merchant, category, type: expense vs income)
         ParsedTransaction tx = parseTransaction(title, text, bigText);
         if (tx == null || tx.amount <= 0) {
             Log.d(TAG, "Could not extract valid amount from notification");
             return;
         }
 
-        Log.i(TAG, "Parsed Transaction: Amount=" + tx.amount + ", Currency=" + tx.currency + ", Merchant=" + tx.merchant + ", Category=" + tx.category);
+        Log.i(TAG, "Parsed Transaction: Type=" + tx.type + ", Amount=" + tx.amount + " " + tx.currency + ", Merchant=" + tx.merchant + ", Category=" + tx.category);
 
-        // 1. Save to local SharedPreferences queue for React app sync
+        // 5. Save to local SharedPreferences queue for React app sync
         saveToLocalQueue(tx);
 
-        // 2. Post directly to Appwrite REST API in background if credentials exist
+        // 6. Post directly to Appwrite REST API in background if credentials exist
         postToAppwrite(tx);
 
-        // 3. Post user confirmation notification
+        // 7. Post user confirmation notification
         postConfirmationNotification(tx);
 
-        // 4. Notify Capacitor bridge if app is running
+        // 8. Notify Capacitor bridge if app is running
         PaymentTrackerPlugin.notifyNewTransaction(tx);
     }
 
-    private boolean containsPaymentKeywords(String text) {
+    /**
+     * Filters out non-transactional notifications: OTP codes, balance reports, declined cards, and bill reminders.
+     */
+    public static boolean isNoiseOrExcludedNotification(String text) {
+        String lower = text.toLowerCase(Locale.ROOT);
+
+        // 1. One-time Passwords, 2FA, Verification Codes
+        if (lower.contains("cod") || lower.contains("code") || lower.contains("parola") ||
+            lower.contains("otp") || lower.contains("securitate") || lower.contains("security code") ||
+            lower.contains("autentificare") || lower.contains("verificare") || lower.contains("verification") ||
+            lower.contains("one-time") || lower.contains("parola unica")) {
+            return true;
+        }
+
+        // 2. Failed, Declined, Cancelled transactions
+        if (lower.contains("respins") || lower.contains("esuat") || lower.contains("declin") ||
+            lower.contains("failed") || lower.contains("anulat") || lower.contains("cancelled") ||
+            lower.contains("insuficient") || lower.contains("insufficient") || lower.contains("neautorizat") ||
+            lower.contains("blocat") || lower.contains("blocked")) {
+            return true;
+        }
+
+        // 3. Balance inquiries & account statements (not a new transaction)
+        if (lower.contains("sold disponibil") || lower.contains("soldul contului") || lower.contains("soldul tau") ||
+            lower.contains("available balance") || lower.contains("account balance") || lower.contains("extras de cont") ||
+            lower.contains("raport cont")) {
+            return true;
+        }
+
+        // 4. Invoices / bills due (reminders, not yet paid)
+        if (lower.contains("de plata pana") || lower.contains("termen de plata") || lower.contains("factura emisa") ||
+            lower.contains("scadenta") || lower.contains("bill due") || lower.contains("payment due")) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if notification from com.google.android.gms specifically represents Google Wallet/Pay.
+     */
+    private boolean isGooglePlayWalletPrompt(String packageName, String title, String text, StatusBarNotification sbn) {
+        if (!"com.google.android.gms".equals(packageName)) return false;
+
+        String lowerTitle = title.toLowerCase(Locale.ROOT);
+        String lowerText = text.toLowerCase(Locale.ROOT);
+
+        boolean hasWalletTitle = lowerTitle.contains("google pay") || lowerTitle.contains("google wallet") || lowerTitle.contains("wallet");
+        boolean hasPaymentKeyword = lowerText.contains("paid") || lowerText.contains("spent") || lowerText.contains("purchase") || lowerText.contains("platit");
+
+        if (hasWalletTitle && hasPaymentKeyword) return true;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && sbn != null && sbn.getNotification() != null) {
+            String channelId = sbn.getNotification().getChannelId();
+            if (channelId != null) {
+                String lowerChannel = channelId.toLowerCase(Locale.ROOT);
+                if ((lowerChannel.contains("wallet") || lowerChannel.contains("pay")) && hasPaymentKeyword) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Verifies that the notification contains an explicit completed transaction verb.
+     */
+    public static boolean containsExplicitTransactionVerbs(String text) {
         String lower = text.toLowerCase(Locale.ROOT);
         return lower.contains("paid") || lower.contains("spent") || lower.contains("purchase") ||
-               lower.contains("payment") || lower.contains("google pay") || lower.contains("google wallet") ||
-               lower.contains("cheltuit") || lower.contains("plata") || lower.contains("tranzactie");
+               lower.contains("received") || lower.contains("refund") || lower.contains("credited") ||
+               lower.contains("ai platit") || lower.contains("plata efectuata") || lower.contains("cumparare pos") ||
+               lower.contains("plata pos") || lower.contains("cheltuit") || lower.contains("ai primit") ||
+               lower.contains("transfer primit") || lower.contains("incasat") || lower.contains("salariu") ||
+               lower.contains("alimentare cont") || lower.contains("rambursat");
+    }
+
+    /**
+     * Detects whether the transaction represents an expense or an income.
+     */
+    public static String detectTransactionType(String text) {
+        String lower = text.toLowerCase(Locale.ROOT);
+
+        // Explicit Income Signals (Romanian & English)
+        if (lower.contains("ai primit") || lower.contains("primit de la") || lower.contains("transfer primit") ||
+            lower.contains("incasat") || lower.contains("incasare") || lower.contains("salariu") ||
+            lower.contains("alimentare cont") || lower.contains("alimentat cu") || lower.contains("depunere") ||
+            lower.contains("creditare cont") || lower.contains("rambursat") || lower.contains("rambursare") ||
+            lower.contains("restituire") || lower.contains("intrat in cont") || lower.contains("ti-a trimis") ||
+            lower.contains("a trimis bani") || lower.contains("bani primiti") ||
+            lower.contains("you received") || lower.contains("received from") || lower.contains("transfer from") ||
+            lower.contains("income") || lower.contains("salary") || lower.contains("refund") ||
+            lower.contains("refunded") || lower.contains("credited") || lower.contains("deposit") ||
+            lower.contains("top-up") || lower.contains("top up") || lower.contains("added money") ||
+            lower.contains("sent you") || lower.matches(".*\\+\\s*([$€£¥₹]|RON|LEI|[0-9]).*")) {
+            return "income";
+        }
+
+        // Explicit Expense Signals
+        if (lower.contains("ai platit") || lower.contains("platit la") || lower.contains("plata la") ||
+            lower.contains("plata efectuata") || lower.contains("plata pos") || lower.contains("cumparare pos") ||
+            lower.contains("cumparare") || lower.contains("cheltuit") || lower.contains("ai cheltuit") ||
+            lower.contains("tranzactie card") || lower.contains("plata cu cardul") || lower.contains("debitat") ||
+            lower.contains("you paid") || lower.contains("paid to") || lower.contains("spent at") ||
+            lower.contains("spent") || lower.contains("purchase") || lower.contains("sent to") ||
+            lower.contains("debited") || lower.matches(".*-\\s*([$€£¥₹]|RON|LEI|[0-9]).*")) {
+            return "expense";
+        }
+
+        // Default to expense if unclear
+        return "expense";
     }
 
     public static class ParsedTransaction {
         public String id;
         public double amount;
+        public String type; // "expense" | "income"
         public String currency;
         public String merchant;
         public String category;
@@ -158,7 +298,7 @@ public class PaymentNotificationService extends NotificationListenerService {
             try {
                 obj.put("id", id);
                 obj.put("amount", amount);
-                obj.put("type", "expense");
+                obj.put("type", type);
                 obj.put("currency", currency);
                 obj.put("merchant", merchant);
                 obj.put("category", category);
@@ -171,18 +311,15 @@ public class PaymentNotificationService extends NotificationListenerService {
     }
 
     /**
-     * Parses amount, merchant, and category from notification contents
+     * Parses amount, merchant, category, and type (expense vs income) from notification contents.
      */
     public static ParsedTransaction parseTransaction(String title, String text, String bigText) {
         String fullContent = (title + " " + text + " " + bigText).replaceAll("\\s+", " ").trim();
         
-        // Regex to extract Amount and Currency
-        // Matches e.g. "$15.50", "15.50 USD", "45,00 RON", "€ 12.99", "£10"
-        Pattern amountPattern = Pattern.compile("([$€£¥₹]|RON|USD|EUR|GBP|CAD|AUD|CHF|lei)\\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\\s*([$€£¥₹]|RON|USD|EUR|GBP|CAD|AUD|CHF|lei)", Pattern.CASE_INSENSITIVE);
-        Matcher m = amountPattern.matcher(fullContent);
+        Matcher m = AMOUNT_PATTERN.matcher(fullContent);
 
         double amount = 0;
-        String currency = "USD";
+        String currency = "RON";
 
         if (m.find()) {
             String curr1 = m.group(1);
@@ -194,9 +331,7 @@ public class PaymentNotificationService extends NotificationListenerService {
             String rawCurr = curr1 != null ? curr1 : curr2;
 
             if (rawVal != null) {
-                try {
-                    amount = Double.parseDouble(rawVal.replace(",", "."));
-                } catch (Exception ignored) {}
+                amount = parseAmount(rawVal);
             }
             if (rawCurr != null) {
                 currency = normalizeCurrency(rawCurr);
@@ -205,30 +340,53 @@ public class PaymentNotificationService extends NotificationListenerService {
 
         if (amount <= 0) return null;
 
-        // Extract Merchant
-        String merchant = "Payment";
-        // Check "to [Merchant]" or "at [Merchant]" or "la [Merchant]"
-        Pattern merchantPattern = Pattern.compile("(?:to|at|la|from|către)\\s+([A-Za-z0-9&'’\\- ]+?)(?:\\s+on|\\s+using|\\s+with|\\.|,|$)", Pattern.CASE_INSENSITIVE);
-        Matcher merchantMatcher = merchantPattern.matcher(fullContent);
-        if (merchantMatcher.find()) {
-            String found = merchantMatcher.group(1).trim();
-            if (found.length() > 1 && found.length() < 35 && !found.equalsIgnoreCase("your card")) {
-                merchant = found;
+        // Determine transaction type (expense vs income)
+        String type = detectTransactionType(fullContent);
+
+        // Extract Merchant / Sender
+        String merchant = "income".equals(type) ? "Income" : "Payment";
+
+        if ("income".equals(type)) {
+            Pattern senderPattern = Pattern.compile("(?:de\\s+la|from|expeditor|primit\\s+de\\s+la)\\s+([A-Za-z0-9&'’\\- ]+?)(?:\\s+pe|\\s+in|\\s+cu|\\.|,|$)", Pattern.CASE_INSENSITIVE);
+            Matcher senderMatcher = senderPattern.matcher(fullContent);
+            if (senderMatcher.find()) {
+                String found = senderMatcher.group(1).trim();
+                if (found.length() > 1 && found.length() < 35 && !found.equalsIgnoreCase("your card") && !found.equalsIgnoreCase("contul tau")) {
+                    merchant = found;
+                }
+            } else if (!title.equalsIgnoreCase("Google Pay") && !title.equalsIgnoreCase("Google Wallet") && !title.equalsIgnoreCase("Revolut") && title.length() > 2) {
+                merchant = title.trim();
             }
-        } else if (!title.equalsIgnoreCase("Google Pay") && !title.equalsIgnoreCase("Google Wallet") && !title.equalsIgnoreCase("Wallet") && title.length() > 2) {
-            merchant = title.trim();
+        } else {
+            Pattern merchantPattern = Pattern.compile("(?:to|at|la|către|la\\s+comerciantul)\\s+([A-Za-z0-9&'’\\- ]+?)(?:\\s+on|\\s+using|\\s+with|\\s+cu|\\.|,|$)", Pattern.CASE_INSENSITIVE);
+            Matcher merchantMatcher = merchantPattern.matcher(fullContent);
+            if (merchantMatcher.find()) {
+                String found = merchantMatcher.group(1).trim();
+                if (found.length() > 1 && found.length() < 35 && !found.equalsIgnoreCase("your card") && !found.equalsIgnoreCase("cardul tau")) {
+                    merchant = found;
+                }
+            } else if (!title.equalsIgnoreCase("Google Pay") && !title.equalsIgnoreCase("Google Wallet") && !title.equalsIgnoreCase("Wallet") && title.length() > 2) {
+                merchant = title.trim();
+            }
         }
 
-        // Categorization based on merchant and keywords
-        String category = categorize(merchant + " " + fullContent);
+        // Categorize based on type and merchant/content
+        String category = "income".equals(type) 
+            ? categorizeIncome(merchant + " " + fullContent)
+            : categorizeExpense(merchant + " " + fullContent);
 
         ParsedTransaction tx = new ParsedTransaction();
         tx.id = UUID.randomUUID().toString();
         tx.amount = Math.round(amount * 100.0) / 100.0;
+        tx.type = type;
         tx.currency = currency;
         tx.merchant = merchant;
         tx.category = category;
-        tx.note = "Auto-tracked via Google Pay: " + merchant;
+        
+        String source = title.isEmpty() ? "Bank Notification" : title;
+        tx.note = "income".equals(type)
+            ? "Auto-tracked income from: " + merchant
+            : "Auto-tracked via " + source + ": " + merchant;
         
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -238,36 +396,71 @@ public class PaymentNotificationService extends NotificationListenerService {
         return tx;
     }
 
+    private static double parseAmount(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return 0;
+        String clean = raw.trim();
+        try {
+            // Handle European formatting (1.250,50) vs US formatting (1,250.50)
+            if (clean.contains(".") && clean.contains(",")) {
+                if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) {
+                    clean = clean.replace(".", "").replace(",", ".");
+                } else {
+                    clean = clean.replace(",", "");
+                }
+            } else if (clean.contains(",")) {
+                clean = clean.replace(",", ".");
+            }
+            return Double.parseDouble(clean);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     private static String normalizeCurrency(String raw) {
+        if (raw == null) return "RON";
         String c = raw.trim().toUpperCase(Locale.ROOT);
         if (c.equals("$")) return "USD";
         if (c.equals("€")) return "EUR";
         if (c.equals("£")) return "GBP";
-        if (c.equals("LEI")) return "RON";
+        if (c.equals("LEI") || c.equals("LEU")) return "RON";
         return c;
     }
 
-    private static String categorize(String text) {
+    private static String categorizeIncome(String text) {
         String lower = text.toLowerCase(Locale.ROOT);
-        if (lower.matches(".*(starbucks|coffee|cafe|mcdonald|kfc|burger|restaurant|pizza|food|bistro|bar|pub|subway|bakery|glovo|wolt|uber eats).*")) {
-            return "Food & Dining";
+        if (lower.contains("salariu") || lower.contains("salary")) {
+            return "Salary";
         }
-        if (lower.matches(".*(mega image|lidl|kaufland|carrefour|aldi|tesco|walmart|target|market|supermarket|grocery|auchan|penny).*")) {
-            return "Groceries";
+        if (lower.contains("freelance") || lower.contains("proiect") || lower.contains("client") || lower.contains("upwork") || lower.contains("fiverr")) {
+            return "Freelance";
         }
-        if (lower.matches(".*(uber|bolt|lyft|taxi|train|metro|bus|shell|omv|petrom|bp|gas|fuel|parking|transit).*")) {
-            return "Transportation";
+        if (lower.contains("ramburs") || lower.contains("refund") || lower.contains("restituire")) {
+            return "Other";
         }
-        if (lower.matches(".*(netflix|spotify|steam|playstation|cinema|movie|theatre|disney|hbo|apple music).*")) {
+        return "Salary";
+    }
+
+    private static String categorizeExpense(String text) {
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (lower.matches(".*(starbucks|coffee|cafe|cafea|mcdonald|kfc|burger|restaurant|pizza|food|mancare|pranz|cina|bistro|bar|pub|subway|bakery|patiserie|glovo|wolt|tazz|uber eats|bolt food).*")) {
+            return "Food";
+        }
+        if (lower.matches(".*(mega image|lidl|kaufland|carrefour|aldi|tesco|walmart|target|market|supermarket|grocery|auchan|penny|profi|metro|selgros).*")) {
+            return "Food";
+        }
+        if (lower.matches(".*(uber|bolt|lyft|taxi|train|tren|metro|metrou|bus|autobuz|stb|shell|omv|petrom|mol|rompetrol|lukoil|bp|gas|benzina|motorina|fuel|parking|parcare|transit).*")) {
+            return "Transport";
+        }
+        if (lower.matches(".*(netflix|spotify|steam|playstation|xbox|cinema|film|movie|theatre|disney|hbo|apple music|youtube|party|club|concert|festival).*")) {
             return "Entertainment";
         }
-        if (lower.matches(".*(amazon|ebay|zara|h&m|ikea|apple store|clothing|shop|store).*")) {
+        if (lower.matches(".*(amazon|ebay|emag|altex|flanco|zara|h&m|hm|ikea|apple store|clothing|haine|shoes|adidasi|shop|store|mall|decathlon|dedeman|leroy).*")) {
             return "Shopping";
         }
-        if (lower.matches(".*(electric|power|water|vodafone|orange|telekom|enel|internet|utility|utilities).*")) {
+        if (lower.matches(".*(electric|power|water|apa nova|vodafone|orange|digi|telekom|enel|eon|hidroelectrica|internet|utility|utilitati|chirie|rent).*")) {
             return "Utilities";
         }
-        return "General";
+        return "Other";
     }
 
     private void saveToLocalQueue(ParsedTransaction tx) {
@@ -314,8 +507,10 @@ public class PaymentNotificationService extends NotificationListenerService {
                 body.put("documentId", "unique()");
                 JSONObject data = new JSONObject();
                 data.put("userId", userId);
-                data.put("type", "expense");
-                data.put("amount", tx.amount);
+                data.put("type", tx.type);
+                // Signed amount: negative for expenses, positive for income
+                double signedAmount = "income".equals(tx.type) ? Math.abs(tx.amount) : -Math.abs(tx.amount);
+                data.put("amount", signedAmount);
                 data.put("category", tx.category);
                 data.put("date", tx.date);
                 data.put("note", tx.note);
@@ -328,10 +523,34 @@ public class PaymentNotificationService extends NotificationListenerService {
 
                 int code = conn.getResponseCode();
                 Log.i(TAG, "Appwrite HTTP response code: " + code);
+                if (code >= 200 && code < 300) {
+                    // Successfully posted directly to Appwrite. Remove from local queue so it is not double-synced
+                    removeFromLocalQueue(tx.id);
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Error posting transaction to Appwrite directly in background", e);
             }
         }).start();
+    }
+
+    private void removeFromLocalQueue(String id) {
+        if (id == null) return;
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String existing = prefs.getString("pending_transactions", "[]");
+            JSONArray arr = new JSONArray(existing);
+            JSONArray updated = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject item = arr.getJSONObject(i);
+                if (!id.equals(item.optString("id"))) {
+                    updated.put(item);
+                }
+            }
+            prefs.edit().putString("pending_transactions", updated.toString()).apply();
+            Log.d(TAG, "Removed transaction " + id + " from local queue after Appwrite post");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to remove transaction from local queue", e);
+        }
     }
 
     private void postConfirmationNotification(ParsedTransaction tx) {
@@ -343,6 +562,7 @@ public class PaymentNotificationService extends NotificationListenerService {
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             intent.putExtra("from_payment_notification", true);
             intent.putExtra("transaction_amount", tx.amount);
+            intent.putExtra("transaction_type", tx.type);
             intent.putExtra("transaction_merchant", tx.merchant);
 
             PendingIntent pendingIntent = PendingIntent.getActivity(
@@ -353,7 +573,8 @@ public class PaymentNotificationService extends NotificationListenerService {
             );
 
             String formattedAmount = String.format(Locale.US, "%.2f", tx.amount);
-            String title = "✅ Logged: -" + tx.currency + " " + formattedAmount;
+            boolean isIncome = "income".equals(tx.type);
+            String title = (isIncome ? "💰 Logged Income: +" : "✅ Logged Expense: -") + tx.currency + " " + formattedAmount;
             String text = tx.merchant + " (" + tx.category + ") • Auto-added to Kore";
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
@@ -377,7 +598,7 @@ public class PaymentNotificationService extends NotificationListenerService {
                     "Kore Payment Tracker Alerts",
                     NotificationManager.IMPORTANCE_HIGH
             );
-            channel.setDescription("Instant confirmations when transactions are logged from Google Pay");
+            channel.setDescription("Instant confirmations when transactions are logged from Google Pay & banking apps");
             channel.enableVibration(true);
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {

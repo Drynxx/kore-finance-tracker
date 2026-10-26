@@ -40,10 +40,12 @@ export const TransactionProvider = ({ children }) => {
                     const pending = await fetchPendingTransactions();
                     if (pending && pending.length > 0) {
                         for (const item of pending) {
+                            const isIncome = item.type === 'income';
+                            const signedAmount = isIncome ? Math.abs(item.amount) : -Math.abs(item.amount);
                             await addTransaction({
-                                type: item.type || 'expense',
-                                amount: item.amount,
-                                category: item.category || 'General',
+                                type: isIncome ? 'income' : 'expense',
+                                amount: signedAmount,
+                                category: item.category || (isIncome ? 'Salary' : 'Other'),
                                 date: item.date || new Date().toISOString(),
                                 note: item.note || `Auto-tracked from ${item.merchant || 'Google Pay'}`
                             });
@@ -58,13 +60,15 @@ export const TransactionProvider = ({ children }) => {
             // Listen for live payment notifications arriving while the app is foregrounded
             const listener = addPaymentDetectedListener((newTx) => {
                 if (newTx && newTx.amount) {
+                    const isIncome = newTx.type === 'income';
+                    const signedAmount = isIncome ? Math.abs(newTx.amount) : -Math.abs(newTx.amount);
                     setTransactions((prev) => {
                         if (prev.some(t => t.id === newTx.id)) return prev;
                         return [{
                             id: newTx.id || String(Date.now()),
-                            type: 'expense',
-                            amount: newTx.amount,
-                            category: newTx.category || 'General',
+                            type: isIncome ? 'income' : 'expense',
+                            amount: signedAmount,
+                            category: newTx.category || (isIncome ? 'Salary' : 'Other'),
                             date: newTx.date || new Date().toISOString(),
                             note: newTx.note || `Auto-tracked: ${newTx.merchant}`
                         }, ...prev];
@@ -96,15 +100,20 @@ export const TransactionProvider = ({ children }) => {
                 ]
             );
 
-            // Transform Appwrite documents to our transaction format
-            const transformedTransactions = response.documents.map(doc => ({
-                id: doc.$id,
-                type: doc.type,
-                amount: doc.amount,
-                category: doc.category,
-                date: doc.date,
-                note: doc.note || ''
-            }));
+            // Transform Appwrite documents to our transaction format with normalized signed amounts
+            const transformedTransactions = response.documents.map(doc => {
+                const amt = parseFloat(doc.amount) || 0;
+                const isIncome = doc.type ? doc.type === 'income' : amt > 0;
+                const signedAmount = isIncome ? Math.abs(amt) : -Math.abs(amt);
+                return {
+                    id: doc.$id,
+                    type: isIncome ? 'income' : 'expense',
+                    amount: signedAmount,
+                    category: doc.category,
+                    date: doc.date,
+                    note: doc.note || ''
+                };
+            });
 
             setTransactions(transformedTransactions);
         } catch (error) {
@@ -230,7 +239,8 @@ export const TransactionProvider = ({ children }) => {
             const monthData = monthMap.get(key);
             monthData.count += 1;
             const amt = parseFloat(t.amount) || 0;
-            if (amt > 0 || t.type === 'income') {
+            const isInc = t.type ? t.type === 'income' : amt > 0;
+            if (isInc) {
                 monthData.income += Math.abs(amt);
             } else {
                 monthData.expense += Math.abs(amt);
@@ -255,7 +265,8 @@ export const TransactionProvider = ({ children }) => {
         // Selected period totals
         const mAmounts = monthlyTransactions.map(t => {
             const amt = parseFloat(t.amount) || 0;
-            return (t.type === 'income' || amt > 0) ? Math.abs(amt) : -Math.abs(amt);
+            const isInc = t.type ? t.type === 'income' : amt > 0;
+            return isInc ? Math.abs(amt) : -Math.abs(amt);
         });
 
         const monthlyIncome = mAmounts
@@ -278,7 +289,8 @@ export const TransactionProvider = ({ children }) => {
         // All-time totals
         const allAmounts = transactions.map(t => {
             const amt = parseFloat(t.amount) || 0;
-            return (t.type === 'income' || amt > 0) ? Math.abs(amt) : -Math.abs(amt);
+            const isInc = t.type ? t.type === 'income' : amt > 0;
+            return isInc ? Math.abs(amt) : -Math.abs(amt);
         });
 
         const allTimeIncome = allAmounts

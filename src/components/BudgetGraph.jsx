@@ -35,7 +35,8 @@ export const BudgetGraph = () => {
 
                 const dayNet = dayTransactions.reduce((sum, t) => {
                     const amt = Math.abs(parseFloat(t.amount) || 0);
-                    return sum + (t.type === 'income' || t.amount > 0 ? amt : -amt);
+                    const isInc = t.type ? t.type === 'income' : t.amount > 0;
+                    return sum + (isInc ? amt : -amt);
                 }, 0);
 
                 runningSum += dayNet;
@@ -54,7 +55,8 @@ export const BudgetGraph = () => {
         // Default: Last 30 Days ending today
         const currentBalance = transactions.reduce((sum, t) => {
             const amt = Math.abs(parseFloat(t.amount) || 0);
-            return sum + (t.type === 'income' || t.amount > 0 ? amt : -amt);
+            const isInc = t.type ? t.type === 'income' : t.amount > 0;
+            return sum + (isInc ? amt : -amt);
         }, 0);
 
         const days = [];
@@ -70,7 +72,8 @@ export const BudgetGraph = () => {
             const dayTransactions = transactions.filter(t => t.date && t.date.startsWith(dateStr));
             const dayNetChange = dayTransactions.reduce((sum, t) => {
                 const amt = Math.abs(parseFloat(t.amount) || 0);
-                return sum + (t.type === 'income' || t.amount > 0 ? amt : -amt);
+                const isInc = t.type ? t.type === 'income' : t.amount > 0;
+                return sum + (isInc ? amt : -amt);
             }, 0);
 
             days.unshift({

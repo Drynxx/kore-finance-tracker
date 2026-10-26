@@ -124,7 +124,8 @@ export const compressFinancialContext = (transactions = [], currentBalance = 0) 
     transactions.forEach(t => {
         if (t.date && t.date.startsWith(currentMonth)) {
             const amt = Math.abs(parseFloat(t.amount) || 0);
-            if (t.type === 'income' || t.amount > 0) {
+            const isInc = t.type ? t.type === 'income' : t.amount > 0;
+            if (isInc) {
                 monthIncome += amt;
             } else {
                 monthExpense += amt;
@@ -143,7 +144,8 @@ export const compressFinancialContext = (transactions = [], currentBalance = 0) 
     // Compact Pipe-Delimited Syntax: "MM-DD|Amt|Cat|Note"
     const compactHistory = recent.map(t => {
         const dateStr = (t.date || '').slice(5);
-        const amt = (t.type === 'income' || t.amount > 0) ? `+${Math.abs(t.amount)}` : `-${Math.abs(t.amount)}`;
+        const isInc = t.type ? t.type === 'income' : t.amount > 0;
+        const amt = isInc ? `+${Math.abs(t.amount)}` : `-${Math.abs(t.amount)}`;
         const note = (t.note || '').slice(0, 20).replace(/\|/g, '/');
         return `${dateStr}|${amt}|${t.category || 'Other'}|${note}`;
     }).join('\n');
@@ -321,11 +323,11 @@ export const parseLocalVoiceShortcut = (text = '', history = []) => {
         if (/(salut|buna|hello|hi|hei)/i.test(clean)) {
             conversational_response = "Salut! Cu ce te pot ajuta? Poți să-mi spui o cheltuială (ex: 'Cafea 15 lei') sau să mă întrebi despre soldul tău.";
         } else if (/(cati bani|sold|balanta|ce am|disponibil)/i.test(clean)) {
-            const balance = history.reduce((sum, t) => sum + (t.type === 'income' || t.amount > 0 ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
+            const balance = history.reduce((sum, t) => sum + ((t.type ? t.type === 'income' : t.amount > 0) ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
             conversational_response = `Soldul tău curent este de ${Math.round(balance * 100) / 100} RON.`;
         } else if (/(cat am cheltuit|cheltuieli|total)/i.test(clean)) {
             const expenses = history
-                .filter(t => t.type === 'expense' || t.amount < 0)
+                .filter(t => t.type ? t.type === 'expense' : t.amount < 0)
                 .reduce((sum, t) => sum + Math.abs(t.amount), 0);
             conversational_response = `Ai cheltuit un total de ${Math.round(expenses * 100) / 100} RON conform istoricului tău.`;
         } else {

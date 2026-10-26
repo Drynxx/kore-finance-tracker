@@ -37,10 +37,12 @@ const SettingsModal = ({ onClose }) => {
             if (res.success && res.transaction) {
                 setSimulationSuccess(res.transaction);
                 if (addTransaction) {
+                    const isIncome = res.transaction.type === 'income';
+                    const signedAmount = isIncome ? Math.abs(res.transaction.amount) : -Math.abs(res.transaction.amount);
                     await addTransaction({
-                        type: 'expense',
-                        amount: res.transaction.amount,
-                        category: res.transaction.category || 'Food & Dining',
+                        type: isIncome ? 'income' : 'expense',
+                        amount: signedAmount,
+                        category: res.transaction.category || (isIncome ? 'Salary' : 'Food'),
                         date: res.transaction.date || new Date().toISOString(),
                         note: res.transaction.note || 'Test: Auto-tracked from Google Pay'
                     });

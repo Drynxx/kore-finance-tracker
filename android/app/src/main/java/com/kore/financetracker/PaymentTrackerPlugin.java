@@ -36,6 +36,7 @@ public class PaymentTrackerPlugin extends Plugin {
                 JSObject obj = new JSObject();
                 obj.put("id", tx.id);
                 obj.put("amount", tx.amount);
+                obj.put("type", tx.type);
                 obj.put("currency", tx.currency);
                 obj.put("merchant", tx.merchant);
                 obj.put("category", tx.category);

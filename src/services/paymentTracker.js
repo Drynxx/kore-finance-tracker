@@ -100,9 +100,10 @@ export const testSimulatePayment = async (title = 'Google Pay', text = 'Paid $14
             transaction: {
                 id: 'mock-' + Date.now(),
                 amount: 14.5,
+                type: 'expense',
                 currency: 'USD',
                 merchant: 'Starbucks',
-                category: 'Food & Dining',
+                category: 'Food',
                 note: 'Auto-tracked via Google Pay: Starbucks',
                 date: new Date().toISOString()
             }
